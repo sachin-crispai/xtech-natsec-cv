@@ -67,6 +67,67 @@
 
 ---
 
+## Hackathon Build — Two Racks from Existing Inventory
+
+### GPU Selection — Pick 12 from What's On Hand
+
+Ranked by performance; pick in order until you have 12:
+
+| Pick | GPU | VRAM | Mem BW | TDP | Count on hand |
+|------|-----|------|--------|-----|---------------|
+| 1–7 | **EVGA GeForce RTX 3070 Ti** | 8 GB GDDR6X | 448 GB/s | 290 W | 7 confirmed (IMG_0081) |
+| 8–11 | **EVGA GeForce RTX 3070** | 8 GB GDDR6 | 448 GB/s | 220 W | 4+ confirmed |
+| 12 | **MSI GeForce RTX 30-series** | 8 GB (assumed) | ~448 GB/s | ~220–290 W | 2 on hand (model TBD) |
+
+> **Spare / bench:** Set XFX cards aside — model unconfirmed, may be different VRAM tier. Confirm before committing to a rack slot.
+
+### Two-Rack Assignment
+
+#### Rack A — Primary (training + heavy inference)
+6× EVGA RTX 3070 Ti — identical cards, cleanest config
+
+| Slot | GPU | VRAM | Power |
+|------|-----|------|-------|
+| 1–6 | EVGA RTX 3070 Ti | 8 GB each → **48 GB total** | ~290 W each → **~1,740 W** |
+
+#### Rack B — Secondary (inference + parallel experiments)
+1× RTX 3070 Ti + 4× RTX 3070 + 1× MSI RTX 30-series
+
+| Slot | GPU | VRAM | Power |
+|------|-----|------|-------|
+| 1 | EVGA RTX 3070 Ti | 8 GB | ~290 W |
+| 2–5 | EVGA RTX 3070 × 4 | 8 GB each | ~220 W each |
+| 6 | MSI RTX 30-series | 8 GB (est.) | ~220–290 W |
+| | **Total** | **48 GB** | **~1,430–1,530 W** |
+
+#### Combined Two-Rack Summary
+
+| | Rack A | Rack B | Total |
+|-|--------|--------|-------|
+| GPUs | 6× RTX 3070 Ti | 1× 3070 Ti + 4× 3070 + 1× MSI | **12 GPUs** |
+| VRAM | 48 GB | 48 GB | **96 GB** |
+| GPU power | ~1,740 W | ~1,500 W | **~3,240 W** |
+| Est. cost | Already owned | Already owned | **$0** |
+
+### What These Can Run at Hackathon Scale
+
+With 8 GB VRAM per card:
+
+| Workload | Notes |
+|----------|-------|
+| YOLOv8 / YOLOv9 | Full training + inference |
+| ResNet-50/101, EfficientDet | Fine-tuning + inference |
+| Detectron2 (instance seg) | Training at batch size 2–4/GPU |
+| ViT-S / ViT-B | Inference and fine-tuning |
+| CLIP, DINO v2 (ViT-B) | Zero-shot CV pipelines |
+| Stable Diffusion 1.5/2.1 | Image augmentation / synthetic data |
+| PyTorch DDP | Multi-GPU distributed training across all 12 |
+| Whisper (medium/large-v2) | Audio transcription if needed |
+
+> **Won't fit without quantization:** models >8B params, SAM-H, ViT-H, SDXL at full precision.
+
+---
+
 ## Proposed Upgrade — Two-Rack GPU Configuration
 
 ### Top 12 GPUs Ranked for NATSEC CV Workloads
