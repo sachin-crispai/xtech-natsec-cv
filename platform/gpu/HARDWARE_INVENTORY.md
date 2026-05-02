@@ -67,6 +67,69 @@
 
 ---
 
+## Proposed Upgrade — Two-Rack GPU Configuration
+
+### Top 12 GPUs Ranked for NATSEC CV Workloads
+
+Ranked by suitability for **computer vision training + inference** in an on-premise, air-gappable PCIe rack environment.
+
+| Rank | GPU | VRAM | Mem BW | TDP | Est. Unit Price | Best For |
+|------|-----|------|--------|-----|-----------------|----------|
+| 1 | **NVIDIA H200 SXM5** | 141 GB HBM3e | 4.8 TB/s | 700 W | ~$35–40k | Large-model CV training |
+| 2 | **NVIDIA B200** | 192 GB HBM3e | 8.0 TB/s | 1,000 W | ~$40–50k | Blackwell flagship; frontier training |
+| 3 | **AMD MI300X** | 192 GB HBM3 | 5.3 TB/s | 750 W | ~$15–20k | Max VRAM, AMD ROCm alternative |
+| 4 | **NVIDIA H100 PCIe** | 80 GB HBM2e | 2.0 TB/s | 350 W | ~$20–25k | Proven training workhorse, PCIe-native |
+| 5 | **NVIDIA L40S** | 48 GB GDDR6 | 864 GB/s | 300 W | ~$10–15k | Best CV balance — training + inference + graphics |
+| 6 | **AMD MI350X** | 288 GB HBM3e | 6.0 TB/s | 750 W | ~$20–25k | Largest VRAM available (2025/26) |
+| 7 | **NVIDIA RTX 6000 Ada** | 48 GB GDDR6 | 864 GB/s | 300 W | ~$6–8k | Workstation tier, same VRAM as L40S, lower cost |
+| 8 | **NVIDIA A100 PCIe 80GB** | 80 GB HBM2 | 1.9 TB/s | 300 W | ~$8–12k (used) | Legacy proven; good bang for used market |
+| 9 | **NVIDIA RTX 5090** | 32 GB GDDR7 | 1.79 TB/s | 575 W | ~$2–3k | Consumer Blackwell; fast for smaller CV models |
+| 10 | **NVIDIA RTX 4090** | 24 GB GDDR6X | 1.0 TB/s | 450 W | ~$1.5–2k | Budget consumer tier; strong single-GPU CV perf |
+| 11 | **NVIDIA L4** | 24 GB GDDR6 | 300 GB/s | 72 W | ~$2–3k | Ultra-low-power inference only; edge/embedded |
+| 12 | **NVIDIA H100 NVL PCIe** | 94 GB HBM2e | 3.9 TB/s | 400 W | ~$25–30k | Higher BW variant of H100 PCIe; NVLink-capable |
+
+---
+
+### Recommended Two-Rack Build
+
+Given NATSEC CV workloads (CV model training + real-time inference), standard PCIe rack infrastructure, and air-gap / on-prem requirement:
+
+#### Rack 1 — Training Rack (6× NVIDIA L40S or H100 PCIe)
+
+| Slot | GPU | VRAM | Power |
+|------|-----|------|-------|
+| 1–6 | NVIDIA L40S × 6 | 48 GB each / 288 GB total | 300 W each → **1,800 W** |
+
+- Fits standard 2U/4U PCIe server (e.g. Supermicro 4124GS, Dell R750xa)
+- 288 GB aggregate VRAM supports training large CV backbone models (ViT-H, DINO v2, SAM)
+- Upgrade path: swap for H100 PCIe (same slot, 350W each) for 480 GB HBM total
+- Estimated rack GPU cost: **~$60–90k** (L40S) or **~$120–150k** (H100 PCIe)
+
+#### Rack 2 — Inference Rack (6× NVIDIA RTX 6000 Ada)
+
+| Slot | GPU | VRAM | Power |
+|------|-----|------|-------|
+| 1–6 | NVIDIA RTX 6000 Ada × 6 | 48 GB each / 288 GB total | 300 W each → **1,800 W** |
+
+- Same VRAM and memory bandwidth as L40S at ~50% lower cost
+- Full Ada Lovelace tensor cores + hardware RT for CV pipelines
+- Optimized for high-throughput batched inference (object detection, segmentation, tracking)
+- Estimated rack GPU cost: **~$36–48k**
+
+#### Combined Two-Rack Summary
+
+| | Rack 1 (Training) | Rack 2 (Inference) |
+|-|-------------------|---------------------|
+| GPU | 6× L40S | 6× RTX 6000 Ada |
+| Total VRAM | 288 GB | 288 GB |
+| Total GPU power | ~1,800 W | ~1,800 W |
+| Est. GPU cost | ~$60–90k | ~$36–48k |
+| **Combined** | | **~$96–138k** |
+
+> **Power budget note:** Each rack needs ~3–4 kW total (GPUs + CPUs + storage + networking). Standard 208V/30A circuits provide ~6 kW — one circuit per rack is sufficient. Liquid cooling or high-airflow rack PDUs recommended for sustained workloads.
+
+---
+
 ## Action Items / TODOs
 
 - [ ] Confirm exact MSI and XFX GPU models (need closer photos or serial numbers)
