@@ -1,0 +1,4 @@
+# inbox is a local sync target — never commit its contents
+*
+!.gitignore
+!.gitkeep
