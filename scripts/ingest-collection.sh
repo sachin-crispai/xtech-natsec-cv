@@ -65,7 +65,9 @@ while IFS= read -r -d '' FILE; do
   EXT="${BASENAME##*.}"
   SIZE="$(du -sh "$FILE" | cut -f1)"
 
-  if [[ "${EXT^^}" == "HEIC" ]]; then
+  EXT_UPPER="$(echo "$EXT" | tr '[:lower:]' '[:upper:]')"
+
+  if [[ "$EXT_UPPER" == "HEIC" ]]; then
     JPG="$PROCESSED/${NAME}.jpg"
     log "[$INDEX] $BASENAME → converting to JPEG ($SIZE)"
     if ! $DRY_RUN; then
@@ -74,7 +76,7 @@ while IFS= read -r -d '' FILE; do
       echo "| $INDEX | \`$BASENAME\` | \`${NAME}.jpg\` | $SIZE | HEIC→JPEG | converted |" >> "$MANIFEST"
     fi
 
-  elif [[ "${EXT^^}" =~ ^(MOV|MP4|AVI)$ ]]; then
+  elif [[ "$EXT_UPPER" == "MOV" || "$EXT_UPPER" == "MP4" || "$EXT_UPPER" == "AVI" ]]; then
     log "[$INDEX] $BASENAME — video, moving to processed/ (not converted) ($SIZE)"
     if ! $DRY_RUN; then
       mv "$FILE" "$PROCESSED/$BASENAME"
