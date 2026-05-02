@@ -5,7 +5,8 @@
 REPO_ROOT       := $(shell pwd)
 COLLECTION_INBOX := platform/collection/inbox
 COLLECTION_PROC  := platform/collection/processed
-ALBUM_NAME       := APPLE-COLLECTION
+ALBUM_NAME       := 810-26-NATSEC-CV
+PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
 
 .DEFAULT_GOAL := help
@@ -38,8 +39,19 @@ check-deps:
 .PHONY: install-deps
 install-deps:
 	@echo "Installing osxphotos..."
-	@command -v pip3 >/dev/null 2>&1 || (echo "ERROR: pip3 not found. Install Python 3 first." && exit 1)
-	pip3 install osxphotos
+	@if command -v pipx >/dev/null 2>&1; then \
+		echo "  Using pipx (recommended)..."; \
+		pipx install osxphotos; \
+	elif command -v brew >/dev/null 2>&1; then \
+		echo "  Using brew..."; \
+		brew install osxphotos; \
+	elif command -v pip3 >/dev/null 2>&1; then \
+		echo "  Using pip3 --user..."; \
+		pip3 install --user osxphotos; \
+	else \
+		echo "ERROR: No package manager found (tried pipx, brew, pip3)."; \
+		exit 1; \
+	fi
 	@echo ""
 	@echo "Done. Verify with: osxphotos --version"
 	@echo ""
@@ -53,11 +65,12 @@ sync-collection:
 	@mkdir -p "$(COLLECTION_INBOX)"
 
 	@if command -v osxphotos >/dev/null 2>&1; then \
-		echo "  Using osxphotos (Photos app / iCloud shared album)..."; \
+		echo "  Using osxphotos → album: $(ALBUM_NAME)"; \
+		echo "  Library: $(PHOTOS_LIBRARY)"; \
 		osxphotos export "$(COLLECTION_INBOX)" \
+			--library "$(PHOTOS_LIBRARY)" \
 			--album "$(ALBUM_NAME)" \
-			--skip-edited-suffix \
-			--original \
+			--skip-edited \
 			--no-progress \
 			--overwrite \
 			2>&1 | grep -v "^$$" || true; \
