@@ -5,6 +5,7 @@
 REPO_ROOT       := $(shell pwd)
 COLLECTION_INBOX := platform/collection/inbox
 COLLECTION_PROC  := platform/collection/processed
+COLLECTION_VIEW  := platform/collection/view
 ALBUM_NAME       := 810-26-NATSEC-CV
 PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
@@ -20,10 +21,13 @@ help:
 	@echo "  make sync-collection     Sync photos from iCloud → inbox/"
 	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "  make collect             sync + ingest in one step"
-	@echo "  make install-deps        Install osxphotos (requires pip3)"
+	@echo "  make open-view           Open view/ in Finder (clean JPEGs only)"
+	@echo "  make view-url            Print file:// URL for Atlas / browser"
+	@echo "  make install-deps        Install osxphotos (requires pipx)"
 	@echo "  make check-deps          Check required tools are present"
 	@echo "  make inbox-status        Show what's waiting in inbox/"
 	@echo "  make clean-inbox         Remove all files from inbox/"
+	@echo "  make clean-view          Rebuild view/ from processed/"
 	@echo ""
 
 # ── Dependency check ───────────────────────────────────────────────────────────
@@ -126,6 +130,29 @@ inbox-status:
 		echo ""; \
 		echo "  Run: make ingest-collection"; \
 	fi
+	@echo ""
+
+# ── View (clean JPEGs only — for Atlas / browser) ──────────────────────────────
+.PHONY: view-url
+view-url:
+	@echo ""
+	@echo "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/"
+	@echo ""
+	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
+	@echo ""
+
+.PHONY: open-view
+open-view:
+	open "$(COLLECTION_VIEW)"
+
+.PHONY: clean-view
+clean-view:
+	@echo "Rebuilding view/ from processed/ (images only)..."
+	@find "$(COLLECTION_VIEW)" -maxdepth 1 -type f -delete
+	@find "$(COLLECTION_PROC)" -maxdepth 1 -type f \
+		\( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) \
+		-exec cp {} "$(COLLECTION_VIEW)/" \;
+	@echo "  Done. view/ has $$(ls "$(COLLECTION_VIEW)" | wc -l | tr -d ' ') file(s)."
 	@echo ""
 
 # ── Clean ──────────────────────────────────────────────────────────────────────

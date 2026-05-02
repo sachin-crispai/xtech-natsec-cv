@@ -1,0 +1,3 @@
+# view/ is a local-only derived directory — never commit its contents
+*
+!.gitignore

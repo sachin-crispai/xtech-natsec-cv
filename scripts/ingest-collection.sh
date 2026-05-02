@@ -8,6 +8,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INBOX="$REPO_ROOT/platform/collection/inbox"
 PROCESSED="$REPO_ROOT/platform/collection/processed"
+VIEW="$REPO_ROOT/platform/collection/view"
 MANIFESTS="$REPO_ROOT/platform/collection/manifests"
 DATE="$(date +%Y-%m-%d)"
 TIMESTAMP="$(date +%Y-%m-%d-%H%M%S)"
@@ -68,26 +69,31 @@ while IFS= read -r -d '' FILE; do
   EXT_UPPER="$(echo "$EXT" | tr '[:lower:]' '[:upper:]')"
 
   if [[ "$EXT_UPPER" == "HEIC" ]]; then
-    JPG="$PROCESSED/${NAME}.jpg"
-    log "[$INDEX] $BASENAME → converting to JPEG ($SIZE)"
+    JPG_NAME="${NAME}.jpg"
+    JPG_PROC="$PROCESSED/$JPG_NAME"
+    JPG_VIEW="$VIEW/$JPG_NAME"
+    log "[$INDEX] $BASENAME → JPEG ($SIZE)"
     if ! $DRY_RUN; then
-      sips -s format jpeg "$FILE" --out "$JPG" > /dev/null 2>&1
+      sips -s format jpeg "$FILE" --out "$JPG_PROC" > /dev/null 2>&1
+      cp "$JPG_PROC" "$JPG_VIEW"
       mv "$FILE" "$PROCESSED/$BASENAME"
-      echo "| $INDEX | \`$BASENAME\` | \`${NAME}.jpg\` | $SIZE | HEIC→JPEG | converted |" >> "$MANIFEST"
+      echo "| $INDEX | \`$BASENAME\` | \`$JPG_NAME\` | $SIZE | HEIC→JPEG | converted |" >> "$MANIFEST"
     fi
 
   elif [[ "$EXT_UPPER" == "MOV" || "$EXT_UPPER" == "MP4" || "$EXT_UPPER" == "AVI" ]]; then
-    log "[$INDEX] $BASENAME — video, moving to processed/ (not converted) ($SIZE)"
+    log "[$INDEX] $BASENAME — video, skipped from view/ ($SIZE)"
     if ! $DRY_RUN; then
       mv "$FILE" "$PROCESSED/$BASENAME"
-      echo "| $INDEX | \`$BASENAME\` | — | $SIZE | video | not converted |" >> "$MANIFEST"
+      echo "| $INDEX | \`$BASENAME\` | — | $SIZE | video | processed only, not in view/ |" >> "$MANIFEST"
     fi
 
   else
-    log "[$INDEX] $BASENAME — image, moving to processed/ ($SIZE)"
+    # JPG / JPEG / PNG — copy to view/ as-is
+    log "[$INDEX] $BASENAME → view/ ($SIZE)"
     if ! $DRY_RUN; then
+      cp "$FILE" "$VIEW/$BASENAME"
       mv "$FILE" "$PROCESSED/$BASENAME"
-      echo "| $INDEX | \`$BASENAME\` | — | $SIZE | image | moved as-is |" >> "$MANIFEST"
+      echo "| $INDEX | \`$BASENAME\` | \`$BASENAME\` | $SIZE | image | copied to view/ |" >> "$MANIFEST"
     fi
   fi
 
