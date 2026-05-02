@@ -22,7 +22,8 @@ help:
 	@echo "  make sync-collection     Sync photos from iCloud → inbox/"
 	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "  make collect             sync + ingest in one step"
-	@echo "  make atlas               Open view/ in Atlas browser (clean JPEGs only)"
+	@echo "  make atlas               Build grid gallery + open in Atlas"
+	@echo "  make build-gallery       Regenerate view/index.html grid"
 	@echo "  make open-view           Open view/ in Finder"
 	@echo "  make view-url            Print file:// URL for Atlas / browser"
 	@echo "  make install-deps        Install osxphotos (requires pipx)"
@@ -143,10 +144,14 @@ view-url:
 	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
 	@echo ""
 
+.PHONY: build-gallery
+build-gallery:
+	@bash scripts/build-gallery.sh
+
 .PHONY: atlas
-atlas:
-	@echo "Opening view/ in Atlas ($(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files)..."
-	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/"
+atlas: build-gallery
+	@echo "Opening gallery in Atlas..."
+	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
 
 .PHONY: open-view
 open-view:
