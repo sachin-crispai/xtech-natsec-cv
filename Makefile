@@ -6,6 +6,7 @@ REPO_ROOT       := $(shell pwd)
 COLLECTION_INBOX := platform/collection/inbox
 COLLECTION_PROC  := platform/collection/processed
 COLLECTION_VIEW  := platform/collection/view
+ATLAS_APP        := ChatGPT Atlas
 ALBUM_NAME       := 810-26-NATSEC-CV
 PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
@@ -21,7 +22,8 @@ help:
 	@echo "  make sync-collection     Sync photos from iCloud → inbox/"
 	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "  make collect             sync + ingest in one step"
-	@echo "  make open-view           Open view/ in Finder (clean JPEGs only)"
+	@echo "  make atlas               Open view/ in Atlas browser (clean JPEGs only)"
+	@echo "  make open-view           Open view/ in Finder"
 	@echo "  make view-url            Print file:// URL for Atlas / browser"
 	@echo "  make install-deps        Install osxphotos (requires pipx)"
 	@echo "  make check-deps          Check required tools are present"
@@ -140,6 +142,11 @@ view-url:
 	@echo ""
 	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
 	@echo ""
+
+.PHONY: atlas
+atlas:
+	@echo "Opening view/ in Atlas ($(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files)..."
+	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/"
 
 .PHONY: open-view
 open-view:
