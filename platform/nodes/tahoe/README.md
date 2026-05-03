@@ -1,9 +1,9 @@
-# Node: Tahoe — Head Node
+# Node: Tahoe — Head Node + Network
 
-**Role:** Head node / GPU compute server  
+**Role:** Head node / GPU compute server + TAHOE secure network gateway  
 **Hardware:** Supermicro (Xeon-based)  
 **GPU target:** 6× NVIDIA GeForce RTX 3070  
-**Project:** CRISP AI — NATSEC-CV / xTech National Security Hackathon
+**Network:** TAHOE — TP-Link DECO mesh, secured via Ethernet Sharing from xcasa (mamba)
 
 ---
 
@@ -12,38 +12,31 @@
 ```
 platform/nodes/tahoe/
 ├── README.md          ← this file
-├── photos/            ← iCloud sync target (album: APPLE-COLLECTION)
-└── docs/              ← slot assignments, config notes, wiring diagrams
+├── photos/            ← hardware photos (server, GPUs, rack install)
+└── network/           ← TAHOE network config, DECO setup docs
+```
+
+## Network Architecture
+
+```
+Internet
+    ↓  (Ethernet — en9 on mamba)
+mamba (xcasa)
+    ↓  Internet Sharing → Wi-Fi soft-AP
+DECO mesh router
+    ↓  TAHOE secure Wi-Fi network
+Team devices / phones
 ```
 
 ## Photo Sync
 
-Photos are sourced from the iCloud shared album **APPLE-COLLECTION**.
-
-To sync locally on macOS:
+Drop Supermicro / DECO / TAHOE setup photos into `photos/` here,
+or add to the `810-26-NATSEC-CV` album in Photos and run:
 
 ```bash
-# Option 1: iCloud Drive (if album is saved to iCloud Drive)
-cp -r ~/Library/Mobile\ Documents/com~apple~CloudDocs/APPLE-COLLECTION/* \
-  platform/nodes/tahoe/photos/
-
-# Option 2: Manual — download from iCloud web, drop into photos/
-# https://www.icloud.com/sharedalbum/#B1q5ON9t3GK4JB9
+make collect && make build-gallery && make atlas
 ```
 
-> Large video files (*.MOV, *.MP4) are gitignored. Add them locally for reference but do not commit.
+## Node Naming Convention
 
-## Node Nomenclature
-
-Nodes in this cluster are named after California lakes/reservoirs — geographically rooted, easy to remember, avoids vendor names:
-
-| Node | Role | Status |
-|------|------|--------|
-| `tahoe` | Head node (Supermicro/Xeon + 6× RTX 3070) | In configuration |
-
-## Hardware Notes
-
-- Server: Supermicro (model TBD from photos)
-- CPU: Intel Xeon (config TBD)
-- GPU slots: PCIe — target 6× RTX 3070 (TBD pending photo review)
-- PSU: TBD — must verify headroom for ~1,320 W GPU load (6× 220 W)
+California lakes — `tahoe`, `sequoia`, `shasta`, `crater`, `mono` …
