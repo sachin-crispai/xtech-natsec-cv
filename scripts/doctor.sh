@@ -185,7 +185,8 @@ else
   echo "$NGINX_ERRORS" | sed 's/^/         /'
 fi
 
-NGINX_PID=$(pgrep -x nginx 2>/dev/null | head -1)
+# Use ps aux to find nginx — pgrep -x misses root-owned processes without sudo
+NGINX_PID=$(ps aux | awk '/nginx: master/{print $2}' | head -1)
 if [ -n "$NGINX_PID" ]; then
   NGINX_USER=$(ps -o user= -p "$NGINX_PID" 2>/dev/null | tr -d ' ')
   pass "nginx running (PID $NGINX_PID, master user: ${NGINX_USER:-?})"
