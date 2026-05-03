@@ -52,6 +52,7 @@ help:
 	@echo "    make hotspot-status      Show hotspot state and connected clients"
 	@echo ""
 	@echo "  Utilities:"
+	@echo "    make check               Full stack health check (hotspot+nginx+dns+gallery)"
 	@echo "    make install-deps        Install osxphotos (requires pipx)"
 	@echo "    make check-deps          Check required tools are present"
 	@echo "    make inbox-status        Show what's waiting in inbox/"
@@ -282,6 +283,62 @@ hotspot-status:
 	@echo "  Connected clients:"
 	@arp -a | grep '192\.168\.2\.' | grep -v '\.255\b' | grep -v 'permanent' | \
 		sed 's/^/    /' || echo "    none"
+	@echo ""
+
+# ── Full stack health check ────────────────────────────────────────────────────
+.PHONY: check
+check:
+	@echo ""
+	@echo "══════════════════════════════════════════"
+	@echo "  NATSEC-CV Stack — Health Check"
+	@echo "══════════════════════════════════════════"
+	@echo ""
+	@echo "── Hotspot (natsec Wi-Fi) ──────────────"
+	@SSID=$$(/usr/libexec/PlistBuddy -c "Print :NAT:AirPort:NetworkName" \
+	  /Library/Preferences/SystemConfiguration/com.apple.nat.plist 2>/dev/null); \
+	EN=$$(/usr/libexec/PlistBuddy -c "Print :NAT:AirPort:Enabled" \
+	  /Library/Preferences/SystemConfiguration/com.apple.nat.plist 2>/dev/null); \
+	echo "  SSID     : $${SSID:-unknown}"; \
+	echo "  Plist    : enabled=$${EN:-?}"
+	@BRIDGE_IP=$$(for br in bridge100 bridge101 bridge102 bridge103; do \
+	    IP=$$(ipconfig getifaddr $$br 2>/dev/null); \
+	    [ -n "$$IP" ] && echo "$$IP" && break; done); \
+	[ -n "$$BRIDGE_IP" ] \
+	  && echo "  Bridge   : ✓ active at $$BRIDGE_IP" \
+	  || echo "  Bridge   : ✗ no IP — run: make hotspot-start"
+	@echo ""
+	@echo "── nginx (web server) ──────────────────"
+	@NPID=$$(pgrep -x nginx 2>/dev/null | head -1); \
+	[ -n "$$NPID" ] \
+	  && echo "  Status   : ✓ running (PID $$NPID)" \
+	  || echo "  Status   : ✗ stopped — run: make serve"
+	@CODE=$$(curl -so /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost/natsec/ 2>/dev/null); \
+	[ "$$CODE" = "200" ] \
+	  && echo "  Gallery  : ✓ http://localhost/natsec/ → 200 OK" \
+	  || echo "  Gallery  : ✗ http://localhost/natsec/ → $$CODE"
+	@echo ""
+	@echo "── dnsmasq (xcasa DNS) ─────────────────"
+	@DPID=$$(cat /tmp/dnsmasq-natsec.pid 2>/dev/null); \
+	if [ -n "$$DPID" ] && ps -p "$$DPID" >/dev/null 2>&1; then \
+	  echo "  Status   : ✓ running (PID $$DPID)"; \
+	  echo "  Resolves : xcasa → $(HOTSPOT_IP)"; \
+	else \
+	  echo "  Status   : ✗ stopped — run: make hotspot-start"; \
+	fi
+	@echo ""
+	@echo "── Connected clients ───────────────────"
+	@CLIENTS=$$(arp -a | grep '192\.168\.2\.' | grep -v '\.255\b' | grep -v 'permanent' | grep -v 'bridge'); \
+	[ -n "$$CLIENTS" ] \
+	  && echo "$$CLIENTS" | sed 's/^/  /' \
+	  || echo "  None connected"
+	@echo ""
+	@echo "── Access URLs ─────────────────────────"
+	@echo "  LAN    : http://$(LAN_HOST)/$(NGINX_SUBPATH)/"
+	@echo "  LAN IP : http://$(LAN_IP)/$(NGINX_SUBPATH)/"
+	@echo "  Hotspot: http://xcasa/$(NGINX_SUBPATH)/    (connect to natsec Wi-Fi first)"
+	@echo "  Hotspot: http://$(HOTSPOT_IP)/$(NGINX_SUBPATH)/  (IP fallback)"
+	@echo ""
+	@echo "══════════════════════════════════════════"
 	@echo ""
 
 # ── Clean ──────────────────────────────────────────────────────────────────────
