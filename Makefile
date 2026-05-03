@@ -40,6 +40,7 @@ help:
 	@echo "  Gallery:"
 	@echo "    make show-gallery        Build gallery + open in Atlas (main command)"
 	@echo "    make show-album          Open source iCloud shared album in Atlas"
+	@echo "    make split-view          Gallery left + iCloud album right in Atlas"
 	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
 	@echo "    make open-view           Open view/ in Finder"
 	@echo "    make view-url            Print file:// URL for Atlas"
@@ -210,6 +211,10 @@ inbox-status:
 .PHONY: build-gallery
 build-gallery:
 	@bash scripts/build-gallery.sh
+
+.PHONY: split-view
+split-view: build-gallery
+	@bash scripts/split-view.sh
 
 .PHONY: show-gallery
 show-gallery: build-gallery
