@@ -10,6 +10,7 @@ ATLAS_APP        := ChatGPT Atlas
 LAN_HOST         := mamba.local
 LAN_IP           := $(shell ipconfig getifaddr en0 2>/dev/null || echo 10.0.0.66)
 ALBUM_NAME       := 810-26-NATSEC-CV
+ICLOUD_URL       := https://www.icloud.com/sharedalbum/\#B1q5ON9t3GK4JB9
 PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
 
@@ -29,8 +30,9 @@ help:
 	@echo "────────────────────────────────────────────────"
 	@echo "  Collection pipeline:"
 	@echo "    make photo-status        Count photos at every pipeline stage + gap analysis"
-	@echo "    make sync-collection     Sync NEW photos only (incremental)"
-	@echo "    make sync-collection-full  Force re-sync ALL photos"
+	@echo "    make sync-from-link      Sync from public iCloud shared album URL"
+	@echo "    make sync-collection     Sync NEW photos only from local Photos app"
+	@echo "    make sync-collection-full  Force re-sync ALL photos from Photos app"
 	@echo "    make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "    make process-videos      Clip MOVs → H.264 MP4s + extract frames"
 	@echo "    make collect             sync (incremental) + ingest in one step"
@@ -148,6 +150,11 @@ sync-collection:
 	fi
 	@echo ""
 	@$(MAKE) inbox-status
+
+# ── Sync from iCloud shared link (no Photos app needed) ───────────────────────
+.PHONY: sync-from-link
+sync-from-link:
+	@bash scripts/sync-icloud-link.sh "$(ICLOUD_URL)"
 
 # ── Full re-sync (all photos, overwrites) ─────────────────────────────────────
 .PHONY: sync-collection-full
