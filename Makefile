@@ -47,6 +47,11 @@ help:
 	@echo "    make serve-status        Show nginx state + reachability URLs"
 	@echo "    make serve-setup         Copy infra/nginx/ configs → nginx conf dir"
 	@echo ""
+	@echo "  Quick start / stop (customer site):"
+	@echo "    make up                  Plug in Ethernet, run this — everything starts"
+	@echo "    make down                Tear everything down cleanly"
+	@echo "    make speedtest           Network diagnostics + gallery serve benchmarks"
+	@echo ""
 	@echo "  Hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
 	@echo "    make hotspot-start       Create 'natsec' Wi-Fi hotspot + xcasa DNS"
 	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
@@ -67,9 +72,12 @@ check-deps:
 	@echo "Checking dependencies..."
 	@command -v rsync        >/dev/null 2>&1 && echo "  ✓ rsync"     || echo "  ✗ rsync"
 	@command -v sips         >/dev/null 2>&1 && echo "  ✓ sips"      || echo "  ✗ sips (macOS built-in)"
-	@command -v ffmpeg       >/dev/null 2>&1 && echo "  ✓ ffmpeg"    || echo "  ✗ ffmpeg — brew install ffmpeg"
-	@command -v osxphotos    >/dev/null 2>&1 && echo "  ✓ osxphotos" || echo "  ✗ osxphotos — make install-deps"
-	@test -f "$(NGINX_BIN)"  && echo "  ✓ nginx"     || echo "  ✗ nginx — brew install nginx"
+	@command -v ffmpeg        >/dev/null 2>&1 && echo "  ✓ ffmpeg"        || echo "  ✗ ffmpeg — brew install ffmpeg"
+	@command -v osxphotos     >/dev/null 2>&1 && echo "  ✓ osxphotos"     || echo "  ✗ osxphotos — make install-deps"
+	@test -f "$(NGINX_BIN)"   && echo "  ✓ nginx"         || echo "  ✗ nginx — brew install nginx"
+	@command -v speedtest-cli >/dev/null 2>&1 && echo "  ✓ speedtest-cli" || echo "  ✗ speedtest-cli — brew install speedtest-cli"
+	@command -v iperf3        >/dev/null 2>&1 && echo "  ✓ iperf3"        || echo "  ✗ iperf3 — brew install iperf3"
+	@command -v dnsmasq       >/dev/null 2>&1 && echo "  ✓ dnsmasq"       || echo "  ✗ dnsmasq — brew install dnsmasq"
 	@echo ""
 
 # ── Install dependencies ───────────────────────────────────────────────────────
@@ -253,6 +261,100 @@ serve-status:
 	@echo ""
 	@echo "  Logs:"
 	@echo "    tail -f /usr/local/var/log/nginx/error.log"
+	@echo ""
+
+
+# ── Quick start / stop ─────────────────────────────────────────────────────────
+.PHONY: up
+up:
+	@echo ""
+	@echo "  ┌─────────────────────────────────────────┐"
+	@echo "  │  NATSEC-CV  —  Starting full stack      │"
+	@echo "  └─────────────────────────────────────────┘"
+	@echo ""
+	@$(MAKE) build-gallery
+	@$(MAKE) hotspot-start
+	@$(MAKE) serve
+	@echo ""
+	@$(MAKE) check
+	@echo "  ┌─────────────────────────────────────────┐"
+	@echo "  │  Ready. Share these with your team:     │"
+	@echo "  │  Wi-Fi   : natsec                       │"
+	@echo "  │  Password: $(HOTSPOT_PASSWORD)           │"
+	@echo "  │  URL     : http://xcasa/natsec/         │"
+	@echo "  └─────────────────────────────────────────┘"
+	@echo ""
+
+.PHONY: down
+down:
+	@echo ""
+	@echo "  Shutting down NATSEC-CV stack..."
+	@$(MAKE) serve-stop       2>/dev/null || true
+	@$(MAKE) hotspot-stop     2>/dev/null || true
+	@echo "  Done."
+	@echo ""
+
+# ── Speed test ─────────────────────────────────────────────────────────────────
+.PHONY: speedtest
+speedtest:
+	@echo ""
+	@echo "══════════════════════════════════════════════════"
+	@echo "  NATSEC-CV Network Diagnostics — $$(date '+%Y-%m-%d %H:%M')"
+	@echo "══════════════════════════════════════════════════"
+	@echo ""
+	@echo "── Ethernet Link ────────────────────────────────"
+	@ETH=$$(networksetup -listallhardwareports 2>/dev/null \
+	  | awk '/Hardware Port:.*[Ee]thernet/{found=1} found && /Device:/{print $$2; found=0}' \
+	  | while read dev; do \
+	      link=$$(ifconfig "$$dev" 2>/dev/null | grep -o 'status: [a-z]*' | awk '{print $$2}'); \
+	      ip=$$(ipconfig getifaddr "$$dev" 2>/dev/null); \
+	      [ "$$link" = "active" ] && [ -n "$$ip" ] && echo "$$dev $$ip" && break; \
+	  done); \
+	if [ -n "$$ETH" ]; then \
+	  DEV=$$(echo $$ETH | awk '{print $$1}'); \
+	  IP=$$(echo $$ETH | awk '{print $$2}'); \
+	  MEDIA=$$(ifconfig $$DEV | grep media | awk '{print $$2, $$3}'); \
+	  echo "  Interface : $$DEV ($$IP)"; \
+	  echo "  Link      : $$MEDIA"; \
+	else \
+	  echo "  ✗ No active Ethernet — plug in cable first"; \
+	fi
+	@echo ""
+	@echo "── Latency ──────────────────────────────────────"
+	@GW=$$(netstat -rn | awk '/default/{print $$2; exit}'); \
+	echo "  Gateway ($$GW):"; \
+	ping -c 4 -i 0.2 $$GW 2>/dev/null | tail -1 | sed 's/^/    /'; \
+	echo "  Cloudflare 1.1.1.1:"; \
+	ping -c 4 -i 0.2 1.1.1.1 2>/dev/null | tail -1 | sed 's/^/    /'
+	@echo ""
+	@echo "── Internet Speed ───────────────────────────────"
+	@command -v speedtest-cli >/dev/null 2>&1 \
+	  && speedtest-cli --simple 2>/dev/null | sed 's/^/  /' \
+	  || echo "  speedtest-cli not installed — run: brew install speedtest-cli"
+	@echo ""
+	@echo "── Gallery Serve Speed (nginx local) ────────────"
+	@if pgrep -x nginx >/dev/null 2>&1; then \
+	  printf "  %-14s" "index.html:"; \
+	  curl -so /dev/null \
+	    -w "%{time_total}s   %{size_download} bytes   %{speed_download} B/s\n" \
+	    http://localhost/$(NGINX_SUBPATH)/ 2>/dev/null; \
+	  printf "  %-14s" "photo (JPEG):"; \
+	  curl -so /dev/null \
+	    -w "%{time_total}s   %{size_download} bytes   %{speed_download} B/s\n" \
+	    http://localhost/$(NGINX_SUBPATH)/IMG_0060.jpg 2>/dev/null; \
+	  printf "  %-14s" "video clip:"; \
+	  curl -so /dev/null \
+	    -w "%{time_total}s   %{size_download} bytes   %{speed_download} B/s\n" \
+	    http://localhost/$(NGINX_SUBPATH)/clips/IMG_0072_clip001.mp4 2>/dev/null; \
+	else \
+	  echo "  nginx not running — start with: make serve"; \
+	fi
+	@echo ""
+	@echo "── Estimated Client Experience on natsec ────────"
+	@echo "  78 KB  index.html  → <0.1s  on any Wi-Fi"
+	@echo "  2-3 MB photo JPEG  → ~0.3s  on 100 Mbps hotspot"
+	@echo "  5-6 MB video clip  → ~0.5s  on 100 Mbps hotspot"
+	@echo "══════════════════════════════════════════════════"
 	@echo ""
 
 # ── Hotspot ────────────────────────────────────────────────────────────────────
