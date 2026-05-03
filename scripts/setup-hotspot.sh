@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Configure and start the 'natsec' Wi-Fi hotspot on mamba
 #
+# Prerequisites:
+#   - Ethernet cable plugged in (USB-C, Thunderbolt, or Display Port adapter)
+#   - Mac gets internet from Ethernet; Wi-Fi is freed for the hotspot
+#
 # What this does:
-#   1. Sets SSID to 'natsec' + WPA2 password in macOS Internet Sharing plist
-#   2. Enables Internet Sharing (Mac shares en0 internet via Wi-Fi soft-AP)
-#   3. Starts dnsmasq so 'xcasa' resolves to the Mac on the hotspot network
-#   4. Ensures nginx serves on the hotspot IP (192.168.2.1)
+#   1. Auto-detects the active Ethernet interface (internet source)
+#   2. Configures macOS Internet Sharing: Ethernet → natsec Wi-Fi hotspot (WPA2)
+#   3. Starts dnsmasq so 'xcasa' resolves to the Mac gateway on the hotspot
+#   4. Reloads nginx so it serves on the hotspot IP
 #
 # Usage:
 #   sudo ./scripts/setup-hotspot.sh [--password <wifi-password>]
@@ -14,12 +18,11 @@
 set -euo pipefail
 
 HOTSPOT_SSID="natsec"
-HOTSPOT_CHANNEL=6
-HOTSPOT_IP="192.168.2.1"         # Mac's IP on the hotspot bridge
+HOTSPOT_IP="192.168.2.1"
 PLIST="/Library/Preferences/SystemConfiguration/com.apple.nat.plist"
 DNSMASQ_CONF="/usr/local/etc/dnsmasq.d/natsec-hotspot.conf"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WIFI_PASSWORD="natsec2026"       # default — override with --password
+WIFI_PASSWORD="natsec2026"
 STOP=false
 
 # ── Args ───────────────────────────────────────────────────────────────────────
@@ -27,14 +30,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --password) WIFI_PASSWORD="$2"; shift 2 ;;
     --stop)     STOP=true; shift ;;
-    *) echo "Unknown: $1"; exit 1 ;;
+    *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
-if [[ $EUID -ne 0 ]]; then
-  echo "  ERROR: run with sudo: sudo $0 $*"
-  exit 1
-fi
+[[ $EUID -ne 0 ]] && { echo "  ERROR: run with sudo: sudo $0 $*"; exit 1; }
 
 # ── Stop ───────────────────────────────────────────────────────────────────────
 if $STOP; then
@@ -42,81 +42,138 @@ if $STOP; then
   echo "  Stopping natsec hotspot..."
   launchctl unload /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
   pkill -f "dnsmasq.*natsec" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Set :NAT:Enabled 0" "$PLIST" 2>/dev/null || true
-  /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 0" "$PLIST" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :NAT:Enabled 0"          "$PLIST" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 0"  "$PLIST" 2>/dev/null || true
   echo "  Hotspot stopped."
   echo ""
   exit 0
 fi
 
+# ── Detect Ethernet interface ──────────────────────────────────────────────────
+# Maps human-readable service names to BSD device names
+detect_ethernet() {
+  local services=("Display Ethernet" "USB 10/100/1000 LAN" "Thunderbolt Ethernet Slot 1, Port 2" "Thunderbolt Ethernet Slot 2, Port 1")
+  for svc in "${services[@]}"; do
+    local dev
+    dev=$(networksetup -listallhardwareports 2>/dev/null \
+      | awk -v s="$svc" '/Hardware Port:/{port=$0} /Device:/{if(port ~ s) print $2}' | head -1)
+    if [[ -n "$dev" ]]; then
+      local ip
+      ip=$(ipconfig getifaddr "$dev" 2>/dev/null || true)
+      if [[ -n "$ip" ]]; then
+        echo "$dev"
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
 echo ""
 echo "  natsec Hotspot Setup"
 echo "  ───────────────────────────────────"
-echo "  SSID     : $HOTSPOT_SSID"
-echo "  Password : $WIFI_PASSWORD"
+
+ETH_DEV=$(detect_ethernet || true)
+
+if [[ -z "$ETH_DEV" ]]; then
+  echo ""
+  echo "  ✗ No Ethernet with internet found."
+  echo ""
+  echo "  Plug in your Ethernet cable (USB-C/Thunderbolt adapter), then re-run:"
+  echo "    make hotspot-start"
+  echo ""
+  echo "  Available adapters on this Mac:"
+  networksetup -listallhardwareports 2>/dev/null \
+    | awk '/Hardware Port:.*[Ee]thernet/{show=1} show && /Device:/{print "    "$0; show=0}'
+  echo ""
+  exit 1
+fi
+
+ETH_IP=$(ipconfig getifaddr "$ETH_DEV")
+ETH_NAME=$(networksetup -listallhardwareports 2>/dev/null \
+  | awk -v d="$ETH_DEV" '/Hardware Port:/{name=substr($0,17)} /Device:/{if($2==d) print name}' | head -1)
+
+echo "  Internet : $ETH_NAME ($ETH_DEV) → $ETH_IP  ✓"
+echo "  Hotspot  : $HOTSPOT_SSID (WPA2) on Wi-Fi (en0)"
 echo "  Gateway  : $HOTSPOT_IP"
-echo "  Hostname : xcasa  →  $HOTSPOT_IP"
+echo "  Hostname : xcasa → $HOTSPOT_IP"
 echo ""
 
-# ── Step 1: Configure Internet Sharing plist ───────────────────────────────────
-echo "  [1/4] Configuring Internet Sharing..."
+# ── Step 1: Configure plist ────────────────────────────────────────────────────
+echo "  [1/4] Configuring Internet Sharing plist..."
+
+# Internet source = detected Ethernet
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Device $ETH_DEV"    "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Enabled 1"          "$PLIST"
+
+# Hotspot settings — WPA2, visible SSID, auto channel
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkName $HOTSPOT_SSID"       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkPassword $WIFI_PASSWORD"  "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Channel 0"                       "$PLIST"  # 0 = auto
-/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:40BitEncrypt 0"                  "$PLIST"  # 0 = WPA2 (not WEP)
+/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:40BitEncrypt 0"                  "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Channel 0"                       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 1"                       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:Enabled 1"                               "$PLIST"
-echo "     SSID: '$HOTSPOT_SSID' | Encryption: WPA2 | Channel: auto"
 
-# ── Step 2: Start Internet Sharing ────────────────────────────────────────────
-echo "  [2/4] Starting Internet Sharing..."
+echo "     Source: $ETH_DEV | SSID: $HOTSPOT_SSID | Encryption: WPA2 | Channel: auto"
+
+# ── Step 2: Restart Internet Sharing ──────────────────────────────────────────
+echo "  [2/4] Restarting Internet Sharing..."
 launchctl unload /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
 sleep 1
 launchctl load  /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist
-sleep 3
-echo "     Internet Sharing started."
+sleep 4
 
-# ── Step 3: Deploy and start dnsmasq for xcasa hostname ───────────────────────
-echo "  [3/4] Starting dnsmasq (xcasa hostname)..."
+# Wait for bridge to get its IP
+echo "     Waiting for hotspot bridge..."
+BRIDGE_IF=""
+for i in 1 2 3 4 5; do
+  BRIDGE_IF=$(ifconfig | awk '/^bridge/{iface=$1} /inet 192\.168\.2\./{print iface; exit}' | tr -d ':')
+  [[ -n "$BRIDGE_IF" ]] && break
+  sleep 2
+done
+
+if [[ -z "$BRIDGE_IF" ]]; then
+  echo "     ⚠  Bridge IP not detected yet — hotspot may take a moment to appear."
+  BRIDGE_IF="bridge100"
+else
+  echo "     Bridge active: $BRIDGE_IF ($HOTSPOT_IP)"
+fi
+
+# ── Step 3: dnsmasq for xcasa hostname ────────────────────────────────────────
+echo "  [3/4] Starting dnsmasq (xcasa → $HOTSPOT_IP)..."
 mkdir -p /usr/local/etc/dnsmasq.d
 cp "$REPO_ROOT/infra/dnsmasq/natsec-hotspot.conf" "$DNSMASQ_CONF"
-
-# Find the actual bridge interface that got 192.168.2.x
-BRIDGE_IF=$(ifconfig | awk '/^bridge/{iface=$1} /inet 192\.168\.2\./{print iface; exit}' | tr -d ':')
-if [[ -z "$BRIDGE_IF" ]]; then
-  BRIDGE_IF="bridge100"
-  echo "     Warning: could not detect bridge — defaulting to bridge100"
-else
-  echo "     Hotspot bridge: $BRIDGE_IF"
-  # Update dnsmasq config with actual interface
-  sed -i '' "s/^interface=.*/interface=$BRIDGE_IF/" "$DNSMASQ_CONF"
-fi
+sed -i '' "s/^interface=.*/interface=$BRIDGE_IF/" "$DNSMASQ_CONF"
 
 pkill -f "dnsmasq.*natsec" 2>/dev/null || true
 sleep 1
-/usr/local/sbin/dnsmasq --conf-file="$DNSMASQ_CONF" --pid-file=/tmp/dnsmasq-natsec.pid
-echo "     dnsmasq started (PID: $(cat /tmp/dnsmasq-natsec.pid 2>/dev/null || echo '?'))"
+/usr/local/sbin/dnsmasq \
+  --conf-file="$DNSMASQ_CONF" \
+  --pid-file=/tmp/dnsmasq-natsec.pid
+echo "     dnsmasq running (PID: $(cat /tmp/dnsmasq-natsec.pid 2>/dev/null || echo '?'))"
 
-# ── Step 4: Update nginx server_name to include xcasa ─────────────────────────
-echo "  [4/4] Confirming nginx is serving on hotspot IP..."
+# ── Step 4: Reload nginx ───────────────────────────────────────────────────────
+echo "  [4/4] Reloading nginx..."
 NGINX_BIN="/usr/local/opt/nginx/bin/nginx"
 NGINX_CONF="/usr/local/etc/nginx/nginx.conf"
 if pgrep -x nginx >/dev/null 2>&1; then
-  "$NGINX_BIN" -s reload -c "$NGINX_CONF" 2>/dev/null && echo "     nginx reloaded." || echo "     nginx reload skipped."
+  "$NGINX_BIN" -s reload -c "$NGINX_CONF" 2>/dev/null \
+    && echo "     nginx reloaded." \
+    || echo "     nginx reload failed — run: make serve"
 else
-  echo "     nginx not running — start it with: make serve"
+  echo "     nginx not running — run: make serve"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
-echo "  ╔══════════════════════════════════════════════════════╗"
-echo "  ║  natsec hotspot is LIVE                              ║"
-echo "  ╠══════════════════════════════════════════════════════╣"
-echo "  ║  Wi-Fi SSID  : natsec                               ║"
-echo "  ║  Password    : $WIFI_PASSWORD                        ║"
-echo "  ╠══════════════════════════════════════════════════════╣"
-echo "  ║  After connecting, open:                            ║"
-echo "  ║    http://xcasa/natsec/       ← friendly hostname   ║"
-echo "  ║    http://$HOTSPOT_IP/natsec/  ← IP fallback          ║"
-echo "  ╚══════════════════════════════════════════════════════╝"
+echo "  ╔═══════════════════════════════════════════════════╗"
+echo "  ║  natsec hotspot LIVE                              ║"
+echo "  ╠═══════════════════════════════════════════════════╣"
+echo "  ║  Wi-Fi  : natsec  |  Password: $WIFI_PASSWORD     ║"
+echo "  ║  Internet via: $ETH_NAME ($ETH_DEV)               ║"
+echo "  ╠═══════════════════════════════════════════════════╣"
+echo "  ║  Connect phone to 'natsec', then open:            ║"
+echo "  ║    http://xcasa/natsec/    ← friendly             ║"
+echo "  ║    http://$HOTSPOT_IP/natsec/ ← IP fallback       ║"
+echo "  ╚═══════════════════════════════════════════════════╝"
 echo ""
