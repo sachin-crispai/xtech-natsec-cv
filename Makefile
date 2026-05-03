@@ -28,10 +28,11 @@ help:
 	@echo "NATSEC-CV Makefile"
 	@echo "────────────────────────────────────────────────"
 	@echo "  Collection pipeline:"
-	@echo "    make sync-collection     Sync photos from iCloud → inbox/"
+	@echo "    make sync-collection     Sync NEW photos only (incremental)"
+	@echo "    make sync-collection-full  Force re-sync ALL photos"
 	@echo "    make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "    make process-videos      Clip MOVs → H.264 MP4s + extract frames"
-	@echo "    make collect             sync + ingest in one step"
+	@echo "    make collect             sync (incremental) + ingest in one step"
 	@echo ""
 	@echo "  Gallery:"
 	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
@@ -124,7 +125,7 @@ sync-collection:
 			--album "$(ALBUM_NAME)" \
 			--skip-edited \
 			--no-progress \
-			--overwrite \
+			--update --only-new \
 			2>&1 | grep -v "^$$" || true; \
 		echo "  Sync complete."; \
 	elif [ -d "$(ICLOUD_DRIVE)/$(ALBUM_NAME)" ]; then \
@@ -137,6 +138,22 @@ sync-collection:
 		echo ""; \
 		exit 1; \
 	fi
+	@echo ""
+	@$(MAKE) inbox-status
+
+# ── Full re-sync (all photos, overwrites) ─────────────────────────────────────
+.PHONY: sync-collection-full
+sync-collection-full:
+	@echo ""
+	@echo "Force re-syncing ALL photos from $(ALBUM_NAME)..."
+	@mkdir -p "$(COLLECTION_INBOX)"
+	@osxphotos export "$(COLLECTION_INBOX)" \
+		--library "$(PHOTOS_LIBRARY)" \
+		--album "$(ALBUM_NAME)" \
+		--skip-edited \
+		--no-progress \
+		--overwrite \
+		2>&1 | grep -v "^$$" || true
 	@echo ""
 	@$(MAKE) inbox-status
 
