@@ -38,8 +38,9 @@ help:
 	@echo "    make collect             sync (incremental) + ingest in one step"
 	@echo ""
 	@echo "  Gallery:"
+	@echo "    make show-gallery        Build gallery + open in Atlas (main command)"
+	@echo "    make show-album          Open source iCloud shared album in Atlas"
 	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
-	@echo "    make atlas               Build gallery + open in ChatGPT Atlas"
 	@echo "    make open-view           Open view/ in Finder"
 	@echo "    make view-url            Print file:// URL for Atlas"
 	@echo ""
@@ -210,10 +211,19 @@ inbox-status:
 build-gallery:
 	@bash scripts/build-gallery.sh
 
-.PHONY: atlas
-atlas: build-gallery
+.PHONY: show-gallery
+show-gallery: build-gallery
 	@echo "Opening gallery in Atlas..."
 	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+
+.PHONY: show-album
+show-album:
+	@echo "Opening iCloud source album in Atlas..."
+	open -a "$(ATLAS_APP)" "$(ICLOUD_URL)"
+
+# keep 'atlas' as alias
+.PHONY: atlas
+atlas: show-gallery
 
 .PHONY: open-view
 open-view:
