@@ -59,8 +59,9 @@ help:
 	@echo "    make speedtest           Network diagnostics + gallery serve benchmarks"
 	@echo ""
 	@echo "  SIERRA — secure customer demo network:"
-	@echo "    make sierra-start        Start SIERRA hotspot + authenticated gallery"
-	@echo "    make sierra-stop         Stop SIERRA network"
+	@echo "    make sierra-start        Configure authenticated gallery on SIERRA"
+	@echo "    make sierra-stop         Stop SIERRA gallery"
+	@echo "    make sierra-dns-setup    Print DNS config instructions for DECO/router"
 	@echo "    make add-guest           NAME=john [PASS=x]  create guest credential + QR"
 	@echo "    make list-guests         Show active guest credentials"
 	@echo "    make revoke-guest        NAME=john  remove one guest"
@@ -336,6 +337,36 @@ sierra-start: build-gallery serve-setup
 	@echo ""
 	@echo "  Starting SIERRA secure customer network (requires sudo)..."
 	sudo bash scripts/sierra-start.sh
+
+.PHONY: sierra-dns-setup
+sierra-dns-setup:
+	@echo ""
+	@TAHOE_IP=$$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr bridge103 2>/dev/null || echo "10.0.0.66"); \
+	echo "  ╔══════════════════════════════════════════════════════════╗"; \
+	echo "  ║  SIERRA DNS Setup — one-time config in DECO/router      ║"; \
+	echo "  ╠══════════════════════════════════════════════════════════╣"; \
+	echo "  ║  TAHOE (this rig) is running dnsmasq at: $$TAHOE_IP     ║"; \
+	echo "  ║  It owns the 'sierra' domain.                           ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  To make  tahoe.sierra  resolve on phones:              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  TP-Link DECO app:                                      ║"; \
+	echo "  ║    More → Advanced → DNS (or Internet → DNS)           ║"; \
+	echo "  ║    Primary DNS   : $$TAHOE_IP                           ║"; \
+	echo "  ║    Secondary DNS : 8.8.8.8                              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  Xfinity/router admin (http://10.0.0.1):                ║"; \
+	echo "  ║    Connected Devices → TAHOE → Reserve IP               ║"; \
+	echo "  ║    Then: DNS → Custom → Primary: $$TAHOE_IP              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  After saving, phones reconnect to SIERRA and then:    ║"; \
+	echo "  ║    http://tahoe.sierra/gallery/   ← works on all phones ║"; \
+	echo "  ║    http://gallery.sierra/         ← short alias        ║"; \
+	echo "  ╠══════════════════════════════════════════════════════════╣"; \
+	echo "  ║  Without DNS config — IP fallback always works:        ║"; \
+	echo "  ║    http://$$TAHOE_IP/gallery/                           ║"; \
+	echo "  ╚══════════════════════════════════════════════════════════╝"; \
+	echo ""
 
 .PHONY: sierra-stop
 sierra-stop:
