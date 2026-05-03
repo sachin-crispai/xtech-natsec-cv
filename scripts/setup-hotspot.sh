@@ -140,7 +140,12 @@ echo "     Source: $ETH_DEV ($ETH_NAME) | SSID: $HOTSPOT_SSID | WPA2 | Channel: 
 # ── Step 2: Restart Internet Sharing ──────────────────────────────────────────
 echo "  [2/4] Restarting Internet Sharing..."
 
-# Kill existing InternetSharing process cleanly
+# Snapshot the Ethernet gateway BEFORE Internet Sharing touches routing
+ETH_GW=$(netstat -rn -f inet 2>/dev/null | awk -v dev="$ETH_DEV" '$NF==dev && /default/{print $2; exit}')
+[ -z "$ETH_GW" ] && ETH_GW=$(netstat -rn | awk '/default.*[0-9]+\.[0-9]+/{print $2; exit}')
+echo "     Ethernet gateway: ${ETH_GW:-unknown}"
+
+# Kill existing InternetSharing cleanly
 pkill -x InternetSharing 2>/dev/null || true
 sleep 1
 
@@ -150,9 +155,17 @@ sleep 1
 launchctl load   /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
 sleep 1
 
-# Also kick the InternetSharing binary directly (handles Sequoia changes)
+# Launch InternetSharing directly (handles Sequoia)
 /usr/libexec/InternetSharing &
-sleep 4
+sleep 5
+
+# Restore Ethernet default route — Internet Sharing often clobbers it
+if [[ -n "$ETH_GW" ]]; then
+  route delete default 2>/dev/null || true
+  route add default "$ETH_GW" 2>/dev/null \
+    && echo "     Default route restored → $ETH_GW via $ETH_DEV" \
+    || echo "     ⚠  Could not restore route — run: sudo route add default $ETH_GW"
+fi
 
 # Wait for bridge to get its IP
 echo "     Waiting for hotspot bridge..."
