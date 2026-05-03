@@ -2,16 +2,22 @@
 # Usage: make <target>
 # Run `make` or `make help` to see all targets.
 
-REPO_ROOT       := $(shell pwd)
+REPO_ROOT        := $(shell pwd)
 COLLECTION_INBOX := platform/collection/inbox
 COLLECTION_PROC  := platform/collection/processed
 COLLECTION_VIEW  := platform/collection/view
 ATLAS_APP        := ChatGPT Atlas
-SERVE_PORT       := 8080
 LAN_HOST         := mamba.local
+LAN_IP           := $(shell ipconfig getifaddr en0 2>/dev/null || echo 10.0.0.66)
 ALBUM_NAME       := 810-26-NATSEC-CV
 PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
+
+# ── nginx / serve ──────────────────────────────────────────────────────────────
+NGINX_BIN        := /usr/local/opt/nginx/bin/nginx
+NGINX_CONF_DIR   := /usr/local/etc/nginx
+NGINX_SUBPATH    := natsec
+SERVE_PORT       := 80
 
 .DEFAULT_GOAL := help
 
@@ -21,29 +27,42 @@ help:
 	@echo ""
 	@echo "NATSEC-CV Makefile"
 	@echo "────────────────────────────────────────────────"
-	@echo "  make sync-collection     Sync photos from iCloud → inbox/"
-	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
-	@echo "  make collect             sync + ingest in one step"
-	@echo "  make atlas               Build gallery + open in Atlas"
-	@echo "  make serve               Serve gallery on LAN — open on phone at mamba.local:8080"
-	@echo "  make process-videos      Clip MOVs → H.264 MP4s + extract frames"
-	@echo "  make build-gallery       Regenerate view/index.html (images + video)"
-	@echo "  make open-view           Open view/ in Finder"
-	@echo "  make view-url            Print file:// URL for Atlas / browser"
-	@echo "  make install-deps        Install osxphotos (requires pipx)"
-	@echo "  make check-deps          Check required tools are present"
-	@echo "  make inbox-status        Show what's waiting in inbox/"
-	@echo "  make clean-inbox         Remove all files from inbox/"
-	@echo "  make clean-view          Rebuild view/ from processed/"
+	@echo "  Collection pipeline:"
+	@echo "    make sync-collection     Sync photos from iCloud → inbox/"
+	@echo "    make ingest-collection   Convert HEIC→JPEG, generate manifest"
+	@echo "    make process-videos      Clip MOVs → H.264 MP4s + extract frames"
+	@echo "    make collect             sync + ingest in one step"
+	@echo ""
+	@echo "  Gallery:"
+	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
+	@echo "    make atlas               Build gallery + open in ChatGPT Atlas"
+	@echo "    make open-view           Open view/ in Finder"
+	@echo "    make view-url            Print file:// URL for Atlas"
+	@echo ""
+	@echo "  LAN server (http://$(LAN_HOST)/$(NGINX_SUBPATH)/):"
+	@echo "    make serve               Build gallery + start nginx on port $(SERVE_PORT) (sudo)"
+	@echo "    make serve-stop          Stop nginx"
+	@echo "    make serve-reload        Reload nginx config (after gallery rebuild)"
+	@echo "    make serve-status        Show nginx state + reachability URLs"
+	@echo "    make serve-setup         Copy infra/nginx/ configs → nginx conf dir"
+	@echo ""
+	@echo "  Utilities:"
+	@echo "    make install-deps        Install osxphotos (requires pipx)"
+	@echo "    make check-deps          Check required tools are present"
+	@echo "    make inbox-status        Show what's waiting in inbox/"
+	@echo "    make clean-inbox         Remove all files from inbox/"
+	@echo "    make clean-view          Rebuild view/ from processed/"
 	@echo ""
 
 # ── Dependency check ───────────────────────────────────────────────────────────
 .PHONY: check-deps
 check-deps:
 	@echo "Checking dependencies..."
-	@command -v rsync     >/dev/null 2>&1 && echo "  ✓ rsync"     || echo "  ✗ rsync (built-in, should always exist)"
-	@command -v sips      >/dev/null 2>&1 && echo "  ✓ sips"      || echo "  ✗ sips (macOS built-in, required for HEIC conversion)"
-	@command -v osxphotos >/dev/null 2>&1 && echo "  ✓ osxphotos" || echo "  ✗ osxphotos — run: make install-deps"
+	@command -v rsync        >/dev/null 2>&1 && echo "  ✓ rsync"     || echo "  ✗ rsync"
+	@command -v sips         >/dev/null 2>&1 && echo "  ✓ sips"      || echo "  ✗ sips (macOS built-in)"
+	@command -v ffmpeg       >/dev/null 2>&1 && echo "  ✓ ffmpeg"    || echo "  ✗ ffmpeg — brew install ffmpeg"
+	@command -v osxphotos    >/dev/null 2>&1 && echo "  ✓ osxphotos" || echo "  ✗ osxphotos — make install-deps"
+	@test -f "$(NGINX_BIN)"  && echo "  ✓ nginx"     || echo "  ✗ nginx — brew install nginx"
 	@echo ""
 
 # ── Install dependencies ───────────────────────────────────────────────────────
@@ -71,10 +90,9 @@ install-deps:
 .PHONY: sync-collection
 sync-collection:
 	@echo ""
-	@echo "Syncing APPLE-COLLECTION → $(COLLECTION_INBOX)/"
+	@echo "Syncing $(ALBUM_NAME) → $(COLLECTION_INBOX)/"
 	@echo "────────────────────────────────────────────────"
 	@mkdir -p "$(COLLECTION_INBOX)"
-
 	@if command -v osxphotos >/dev/null 2>&1; then \
 		echo "  Using osxphotos → album: $(ALBUM_NAME)"; \
 		echo "  Library: $(PHOTOS_LIBRARY)"; \
@@ -88,26 +106,14 @@ sync-collection:
 		echo "  Sync complete."; \
 	elif [ -d "$(ICLOUD_DRIVE)/$(ALBUM_NAME)" ]; then \
 		echo "  osxphotos not found — falling back to iCloud Drive rsync..."; \
-		rsync -av --progress \
-			"$(ICLOUD_DRIVE)/$(ALBUM_NAME)/" \
-			"$(COLLECTION_INBOX)/"; \
+		rsync -av --progress "$(ICLOUD_DRIVE)/$(ALBUM_NAME)/" "$(COLLECTION_INBOX)/"; \
 		echo "  Sync complete."; \
 	else \
 		echo ""; \
-		echo "  ⚠  Cannot auto-sync: osxphotos not installed and"; \
-		echo "     iCloud Drive path not found."; \
-		echo ""; \
-		echo "  Fix option 1 (recommended):"; \
-		echo "    make install-deps   # installs osxphotos"; \
-		echo "    make sync-collection"; \
-		echo ""; \
-		echo "  Fix option 2 (manual):"; \
-		echo "    Open: https://www.icloud.com/sharedalbum/#B1q5ON9t3GK4JB9"; \
-		echo "    Download all photos → drop into: $(COLLECTION_INBOX)/"; \
+		echo "  ⚠  Cannot auto-sync. Run: make install-deps"; \
 		echo ""; \
 		exit 1; \
 	fi
-
 	@echo ""
 	@$(MAKE) inbox-status
 
@@ -116,6 +122,11 @@ sync-collection:
 ingest-collection:
 	@echo ""
 	@bash scripts/ingest-collection.sh
+
+# ── Video processing ───────────────────────────────────────────────────────────
+.PHONY: process-videos
+process-videos:
+	@bash scripts/process-videos.sh
 
 # ── Sync + ingest in one step ──────────────────────────────────────────────────
 .PHONY: collect
@@ -139,32 +150,7 @@ inbox-status:
 	fi
 	@echo ""
 
-# ── View (clean JPEGs only — for Atlas / browser) ──────────────────────────────
-.PHONY: view-url
-view-url:
-	@echo ""
-	@echo "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/"
-	@echo ""
-	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
-	@echo ""
-
-.PHONY: serve
-serve: build-gallery
-	@echo ""
-	@echo "  NATSEC-CV Gallery — local network server"
-	@echo "  ────────────────────────────────────────"
-	@echo "  Mac  (Atlas):  file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
-	@echo "  Phone/browser: http://$(LAN_HOST):$(SERVE_PORT)"
-	@echo "  IP fallback:   http://$(shell ipconfig getifaddr en0 2>/dev/null || echo '10.0.0.66'):$(SERVE_PORT)"
-	@echo ""
-	@echo "  Serving $(COLLECTION_VIEW)/ — Ctrl+C to stop"
-	@echo ""
-	cd "$(COLLECTION_VIEW)" && python3 -m http.server $(SERVE_PORT) --bind 0.0.0.0
-
-.PHONY: process-videos
-process-videos:
-	@bash scripts/process-videos.sh
-
+# ── Gallery ────────────────────────────────────────────────────────────────────
 .PHONY: build-gallery
 build-gallery:
 	@bash scripts/build-gallery.sh
@@ -178,6 +164,12 @@ atlas: build-gallery
 open-view:
 	open "$(COLLECTION_VIEW)"
 
+.PHONY: view-url
+view-url:
+	@echo ""
+	@echo "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+	@echo ""
+
 .PHONY: clean-view
 clean-view:
 	@echo "Rebuilding view/ from processed/ (images only)..."
@@ -186,6 +178,64 @@ clean-view:
 		\( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) \
 		-exec cp {} "$(COLLECTION_VIEW)/" \;
 	@echo "  Done. view/ has $$(ls "$(COLLECTION_VIEW)" | wc -l | tr -d ' ') file(s)."
+	@echo ""
+
+# ── nginx LAN server ───────────────────────────────────────────────────────────
+.PHONY: serve-setup
+serve-setup:
+	@echo ""
+	@echo "  Setting up nginx for /$(NGINX_SUBPATH) on port $(SERVE_PORT)..."
+	@test -f "$(NGINX_BIN)" || { echo "  ERROR: nginx not found. Run: brew install nginx"; exit 1; }
+	@mkdir -p "$(NGINX_CONF_DIR)/servers"
+	@cp infra/nginx/nginx.conf "$(NGINX_CONF_DIR)/nginx.conf"
+	@cp infra/nginx/natsec.conf "$(NGINX_CONF_DIR)/servers/natsec.conf"
+	@echo "  Copied nginx.conf → $(NGINX_CONF_DIR)/nginx.conf"
+	@echo "  Copied natsec.conf → $(NGINX_CONF_DIR)/servers/natsec.conf"
+	@$(NGINX_BIN) -t -c "$(NGINX_CONF_DIR)/nginx.conf" 2>&1 | sed 's/^/  /' && \
+		echo "  Config OK." || { echo "  Config FAILED — check above."; exit 1; }
+	@echo ""
+
+.PHONY: serve
+serve: build-gallery serve-setup
+	@echo ""
+	@echo "  NATSEC-CV Gallery — nginx LAN server"
+	@echo "  ─────────────────────────────────────────────────"
+	@echo "  iOS / Safari:  http://$(LAN_HOST)/$(NGINX_SUBPATH)/"
+	@echo "  Android / IP:  http://$(LAN_IP)/$(NGINX_SUBPATH)/"
+	@echo "  Mac (Atlas):   file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+	@echo ""
+	@echo "  Running on port $(SERVE_PORT) — Ctrl+C to stop"
+	@echo ""
+	sudo $(NGINX_BIN) -g 'daemon off;' -c "$(NGINX_CONF_DIR)/nginx.conf"
+
+.PHONY: serve-stop
+serve-stop:
+	@echo "  Stopping nginx..."
+	@sudo $(NGINX_BIN) -s stop 2>/dev/null && echo "  Stopped." || echo "  nginx was not running."
+	@echo ""
+
+.PHONY: serve-reload
+serve-reload:
+	@echo "  Reloading nginx (picking up new gallery files)..."
+	@sudo $(NGINX_BIN) -s reload && echo "  Reloaded." || echo "  nginx not running — run: make serve"
+	@echo ""
+
+.PHONY: serve-status
+serve-status:
+	@echo ""
+	@echo "  nginx status:"
+	@pgrep -x nginx >/dev/null 2>&1 && echo "  ✓ Running (PID: $$(pgrep -x nginx | head -1))" || echo "  ✗ Not running"
+	@echo ""
+	@echo "  Config test:"
+	@$(NGINX_BIN) -t -c "$(NGINX_CONF_DIR)/nginx.conf" 2>&1 | sed 's/^/    /'
+	@echo ""
+	@echo "  Reachable at:"
+	@echo "    iOS/Safari  : http://$(LAN_HOST)/$(NGINX_SUBPATH)/"
+	@echo "    Android/IP  : http://$(LAN_IP)/$(NGINX_SUBPATH)/"
+	@echo "    Local test  : http://localhost/$(NGINX_SUBPATH)/"
+	@echo ""
+	@echo "  Logs:"
+	@echo "    tail -f /usr/local/var/log/nginx/error.log"
 	@echo ""
 
 # ── Clean ──────────────────────────────────────────────────────────────────────
