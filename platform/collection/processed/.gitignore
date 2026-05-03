@@ -1,0 +1,9 @@
+# Large binaries — gitignore videos; commit JPEGs only if explicitly staged
+*.MOV
+*.mov
+*.MP4
+*.mp4
+*.AVI
+*.avi
+*.HEIC
+*.heic

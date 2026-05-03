@@ -20,3 +20,8 @@ frontend/.vite/
 
 # Data
 data/sample/*.mp4
+
+# Large binary outputs — use Git LFS or external storage
+platform/collection/processed/
+*.MOV
+*.mov
