@@ -85,6 +85,30 @@ cat > "$OUT" <<HTMLEOF
   }
   .pill span { color: #7eb8f7; font-weight: 600; }
   .pill.vid span { color: #f7a750; }
+  .pill.doc span { color: #86efac; }
+
+  /* ── Docs bar ── */
+  .docs-bar {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    padding: 10px 20px; background: #0e1a12;
+    border-bottom: 1px solid #1a2e1e;
+    align-items: center;
+  }
+  .docs-bar-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .08em; color: #4ade80; margin-right: 4px;
+  }
+  .doc-link {
+    display: flex; align-items: center; gap: 7px;
+    background: #0f2b19; border: 1px solid #166534;
+    border-radius: 7px; padding: 6px 14px;
+    color: #86efac; font-size: 12px; font-weight: 500;
+    text-decoration: none; transition: background .15s, border-color .15s;
+  }
+  .doc-link:hover { background: #14532d; border-color: #4ade80; color: #fff; }
+  .doc-link .doc-icon { font-size: 16px; line-height: 1; }
+  .doc-link .doc-name { font-weight: 600; }
+  .doc-link .doc-desc { color: #4ade80; font-size: 11px; }
 
   /* ── Toolbar ── */
   .toolbar {
@@ -223,6 +247,26 @@ cat > "$OUT" <<HTMLEOF
   <span class="pill vid">Clips <span>$CLIP_COUNT</span></span>
   <span class="pill" id="sel-count-pill">Selected <span id="sel-num">0</span></span>
 </header>
+
+<!-- ── Docs bar — architecture and reference documents ── -->
+$([ -f "$VIEW/SIERRA-ARCHITECTURE.pdf" ] && echo '
+<div class="docs-bar">
+  <span class="docs-bar-label">Docs</span>
+  <a class="doc-link" href="SIERRA-ARCHITECTURE.pdf" target="_blank">
+    <span class="doc-icon">&#128196;</span>
+    <span>
+      <span class="doc-name">SIERRA Architecture</span><br>
+      <span class="doc-desc">4-tier system diagram + glossary · PDF</span>
+    </span>
+  </a>
+  <a class="doc-link" href="../../../docs/architecture/SIERRA-ARCHITECTURE.html" target="_blank">
+    <span class="doc-icon">&#127760;</span>
+    <span>
+      <span class="doc-name">SIERRA Architecture</span><br>
+      <span class="doc-desc">Interactive Mermaid diagram · HTML</span>
+    </span>
+  </a>
+</div>' || echo '')
 
 <div class="toolbar">
   <input id="search" type="text" placeholder="Filter filename…" oninput="filterCards()">

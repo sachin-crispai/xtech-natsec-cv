@@ -208,6 +208,19 @@ inbox-status:
 	@echo ""
 
 # ── Gallery ────────────────────────────────────────────────────────────────────
+.PHONY: gen-pdf
+gen-pdf:
+	@echo "  Generating SIERRA-ARCHITECTURE.pdf via Chrome headless..."
+	@"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+	  --headless --disable-gpu \
+	  --print-to-pdf="$(REPO_ROOT)/$(COLLECTION_VIEW)/SIERRA-ARCHITECTURE.pdf" \
+	  --print-to-pdf-no-header \
+	  --no-margins \
+	  "file://$(REPO_ROOT)/docs/architecture/SIERRA-ARCHITECTURE.html" \
+	  2>/dev/null \
+	  && echo "  Done → $(COLLECTION_VIEW)/SIERRA-ARCHITECTURE.pdf" \
+	  || echo "  Failed — is Google Chrome installed?"
+
 .PHONY: build-gallery
 build-gallery:
 	@bash scripts/build-gallery.sh
