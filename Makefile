@@ -58,9 +58,10 @@ help:
 	@echo "    make hotspot-status      Show hotspot state and connected clients"
 	@echo ""
 	@echo "  Diagnostics / recovery:"
-	@echo "    make check               Full stack health check"
+	@echo "    make doctor              Deep hotspot + stack diagnosis with exact fixes"
+	@echo "    make check               Quick health check (all layers)"
 	@echo "    make speedtest           Network speed + gallery benchmarks"
-	@echo "    make fix-routes          Fix broken IPv4 routing after hotspot start (safe)"
+	@echo "    make fix-routes          Fix broken IPv4 routing after hotspot start"
 	@echo "    make show-notes          Known issues, gotchas, and field fixes"
 	@echo "    make enable-touchid      Use Touch ID fingerprint for all sudo commands"
 	@echo "    make disable-touchid     Revert to password for sudo"
@@ -460,6 +461,14 @@ check:
 	@echo ""
 	@echo "══════════════════════════════════════════"
 	@echo ""
+
+# ── Doctor ─────────────────────────────────────────────────────────────────────
+# Deep diagnostic for hotspot + full stack. Checks each known failure mode,
+# prints PASS/FAIL, and for every failure prints the exact fix command.
+# Safe to run at any time — read-only, no changes made.
+.PHONY: doctor
+doctor:
+	@bash scripts/doctor.sh
 
 # ── Touch ID for sudo ──────────────────────────────────────────────────────────
 #
