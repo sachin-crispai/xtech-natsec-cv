@@ -58,7 +58,15 @@ help:
 	@echo "    make down                Tear everything down cleanly"
 	@echo "    make speedtest           Network diagnostics + gallery serve benchmarks"
 	@echo ""
-	@echo "  Hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
+	@echo "  SIERRA — secure customer demo network:"
+	@echo "    make sierra-start        Start SIERRA hotspot + authenticated gallery"
+	@echo "    make sierra-stop         Stop SIERRA network"
+	@echo "    make add-guest           NAME=john [PASS=x]  create guest credential + QR"
+	@echo "    make list-guests         Show active guest credentials"
+	@echo "    make revoke-guest        NAME=john  remove one guest"
+	@echo "    make revoke-all-guests   Lock gallery after demo (remove all guests)"
+	@echo ""
+	@echo "  TAHOE ops hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
 	@echo "    make hotspot-start       Create 'natsec' Wi-Fi hotspot + xcasa DNS"
 	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
 	@echo "    make hotspot-status      Show hotspot state and connected clients"
@@ -319,6 +327,48 @@ serve-status:
 	@echo ""
 
 
+# ── SIERRA secure customer network ────────────────────────────────────────────
+NAME ?=
+PASS ?=
+
+.PHONY: sierra-start
+sierra-start: build-gallery serve-setup
+	@echo ""
+	@echo "  Starting SIERRA secure customer network (requires sudo)..."
+	sudo bash scripts/sierra-start.sh
+
+.PHONY: sierra-stop
+sierra-stop:
+	@echo ""
+	@echo "  Stopping SIERRA..."
+	@sudo pkill -f "dnsmasq.*sierra" 2>/dev/null || true
+	@sudo /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 0" \
+	  /Library/Preferences/SystemConfiguration/com.apple.nat.plist 2>/dev/null || true
+	@sudo launchctl kickstart -k system/com.apple.NetworkSharing 2>/dev/null || true
+	@sudo rm -f /usr/local/etc/nginx/servers/sierra.conf
+	@sudo /usr/local/opt/nginx/bin/nginx -s reload \
+	  -c /usr/local/etc/nginx/nginx.conf 2>/dev/null || true
+	@echo "  SIERRA stopped. Guests can no longer connect."
+	@echo ""
+
+.PHONY: add-guest
+add-guest:
+	@[ -n "$(NAME)" ] || { echo "  Usage: make add-guest NAME=john [PASS=secret]"; exit 1; }
+	@sudo bash scripts/manage-guests.sh add "$(NAME)" "$(PASS)"
+
+.PHONY: list-guests
+list-guests:
+	@bash scripts/manage-guests.sh list
+
+.PHONY: revoke-guest
+revoke-guest:
+	@[ -n "$(NAME)" ] || { echo "  Usage: make revoke-guest NAME=john"; exit 1; }
+	@sudo bash scripts/manage-guests.sh revoke "$(NAME)"
+
+.PHONY: revoke-all-guests
+revoke-all-guests:
+	@sudo bash scripts/manage-guests.sh revoke-all
+
 # ── Quick start / stop ─────────────────────────────────────────────────────────
 .PHONY: up
 up:
@@ -414,6 +464,10 @@ speedtest:
 
 # ── Hotspot ────────────────────────────────────────────────────────────────────
 HOTSPOT_SSID     := natsec
+SIERRA_SSID      := SIERRA
+SIERRA_PASS      := sierra2026
+SIERRA_GATEWAY   := 192.168.2.1
+SIERRA_AUTH_FILE := /usr/local/etc/nginx/.sierra-auth
 HOTSPOT_PASSWORD := natsec2026
 HOTSPOT_IP       := 192.168.2.1
 
