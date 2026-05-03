@@ -132,52 +132,60 @@ graph TD
   classDef edgeLite   fill:#292524,stroke:#fbbf24,stroke-width:1px,color:#fef9c3
   classDef edgeMin    fill:#1c1917,stroke:#9ca3af,stroke-width:1px,color:#f3f4f6
 
-  subgraph VEGAS_TIER ["VEGAS TIER - Global Brain Centers  2-3 sites"]
-    MEAD["MEAD<br>16x H200 SXM5<br>VRAM: 2.2 TB  BW: 76.8 TB/s<br>63 PFLOPS FP8<br>Foundation model training"]
-    POWELL["POWELL<br>16x H200 SXM5<br>VRAM: 2.2 TB  BW: 76.8 TB/s<br>63 PFLOPS FP8<br>Training and inference"]
-    HAVASU["HAVASU<br>8x H100 SXM5<br>VRAM: 640 GB  BW: 26.8 TB/s<br>32 PFLOPS FP8<br>Tertiary - future site"]
-    MAMBA["mamba<br>RTX 3070 Ti  8 GB<br>Operator workstation<br>VPN-only  location-agnostic"]
+  subgraph VEGAS_TIER [VEGAS TIER - Global Brain Centers 2-3 sites]
+    MEAD[MEAD - 16x H200 SXM5 - 2.2 TB VRAM - 63 PFLOPS FP8]
+    POWELL[POWELL - 16x H200 SXM5 - 2.2 TB VRAM - 63 PFLOPS FP8]
+    HAVASU[HAVASU - 8x H100 SXM5 - 640 GB VRAM - 32 PFLOPS FP8]
+    MAMBA[mamba - RTX 3070 Ti 8 GB - Operator Node - VPN only]
   end
 
-  subgraph SIERRA_ZONE ["SIERRA ZONE - Secure Operations  Las Vegas NV"]
-    subgraph TAHOE_TIER ["TAHOE TIER - Operational Hubs  approx 200 nodes"]
-      TAHOE["TAHOE HUB<br>8x H100 SXM5<br>640 GB  32 PFLOPS<br>Central hub - all sync here"]
-      SHASTA["SHASTA<br>8x H100 SXM5<br>640 GB  32 PFLOPS<br>Northern zone"]
-      OROVILLE["OROVILLE<br>4x H100 SXM5<br>320 GB  16 PFLOPS<br>Central zone"]
-      BERRYESSA["BERRYESSA<br>4x H100 SXM5<br>320 GB  16 PFLOPS<br>Southern zone"]
+  subgraph SIERRA_ZONE [SIERRA ZONE - Secure Operations Las Vegas NV]
+    subgraph TAHOE_TIER [TAHOE TIER - Operational Hubs approx 200 nodes]
+      TAHOE[TAHOE HUB - 8x H100 SXM5 - 640 GB - 32 PFLOPS - Central hub]
+      SHASTA[SHASTA - 8x H100 SXM5 - 640 GB - 32 PFLOPS - Northern zone]
+      OROVILLE[OROVILLE - 4x H100 SXM5 - 320 GB - 16 PFLOPS - Central zone]
+      BERRYESSA[BERRYESSA - 4x H100 SXM5 - 320 GB - 16 PFLOPS - Southern zone]
     end
 
-    subgraph SUB_TIER ["SUB-CONTROLLERS - ALMANOR-DONNER Class  4-5 per hub"]
-      ALMANOR["ALMANOR<br>2x L40S  96 GB<br>CV inference<br>Lake Almanor CA"]
-      DONNER["DONNER<br>2x L40S  96 GB<br>CV inference<br>Donner Lake CA"]
-      TENAYA["TENAYA<br>2x RTX 6000 Ada  96 GB<br>Edge aggregation<br>Tenaya Lake"]
-      CASCADE["CASCADE<br>2x RTX 6000 Ada  96 GB<br>Edge aggregation<br>Cascade Lake CA"]
-      CONVICT["CONVICT<br>1x L40S  48 GB<br>Relay and inference<br>Convict Lake CA"]
+    subgraph SUB_TIER [SUB-CONTROLLERS ALMANOR-DONNER Class 4-5 per hub]
+      ALMANOR[ALMANOR - 2x L40S 96 GB - CV inference - Lake Almanor CA]
+      DONNER[DONNER - 2x L40S 96 GB - CV inference - Donner Lake CA]
+      TENAYA[TENAYA - 2x RTX6000 Ada 96 GB - Edge aggregation]
+      CASCADE[CASCADE - 2x RTX6000 Ada 96 GB - Edge aggregation]
+      CONVICT[CONVICT - 1x L40S 48 GB - Relay inference]
     end
   end
 
-  subgraph EDGE_TIER ["EDGE TIER - Drone Masters  approx 100000 nodes"]
-    EDGE_STD["Standard Class<br>edge-00001 to edge-50000<br>1x RTX 4090  24 GB<br>Swarm control and inference<br>Failover to backup TAHOE hub"]
-    EDGE_LITE["Lite Class<br>edge-50001 to edge-90000<br>1x RTX 3070  8 GB<br>Inference only<br>Failover to backup sub-ctrl"]
-    EDGE_MIN["Minimal Class<br>edge-90001 to edge-99999<br>Jetson AGX Orin  32 GB<br>Ultra-light autonomous<br>Radio mesh or 5G"]
+  subgraph EDGE_TIER [EDGE TIER - Drone Masters approx 100000 nodes]
+    EDGE_STD[Standard - edge-00001 to 50000 - RTX4090 24GB - Swarm control]
+    EDGE_LITE[Lite - edge-50001 to 90000 - RTX3070 8GB - Inference only]
+    EDGE_MIN[Minimal - edge-90001 to 99999 - Jetson AGX Orin 32GB - Autonomous]
   end
 
-  MEAD   <-->|VPN fabric NDR 400 GbE| TAHOE
-  POWELL <-->|VPN fabric NDR 400 GbE| TAHOE
-  HAVASU <-->|VPN fabric HDR 200 GbE| SHASTA
-  MAMBA  -.->|VPN location-agnostic| TAHOE
+  MEAD --> TAHOE
+  POWELL --> TAHOE
+  TAHOE --> MEAD
+  TAHOE --> POWELL
+  HAVASU --> SHASTA
+  SHASTA --> HAVASU
+  MAMBA -.-> TAHOE
 
-  TAHOE    <-->|bidirectional sync| ALMANOR
-  TAHOE    <-->|bidirectional sync| DONNER
-  SHASTA   <-->|bidirectional sync| TENAYA
-  SHASTA   <-->|bidirectional sync| CASCADE
-  OROVILLE <-->|bidirectional sync| CONVICT
+  TAHOE --> ALMANOR
+  TAHOE --> DONNER
+  ALMANOR --> TAHOE
+  DONNER --> TAHOE
+  SHASTA --> TENAYA
+  SHASTA --> CASCADE
+  TENAYA --> SHASTA
+  CASCADE --> SHASTA
+  OROVILLE --> CONVICT
+  CONVICT --> OROVILLE
 
-  ALMANOR  -->|controls assigned fleet| EDGE_STD
-  DONNER   -->|controls assigned fleet| EDGE_STD
-  TENAYA   -->|controls| EDGE_LITE
-  CASCADE  -->|controls| EDGE_LITE
-  CONVICT  -->|controls| EDGE_MIN
+  ALMANOR --> EDGE_STD
+  DONNER --> EDGE_STD
+  TENAYA --> EDGE_LITE
+  CASCADE --> EDGE_LITE
+  CONVICT --> EDGE_MIN
 
   class MEAD,POWELL,HAVASU vegasBrain
   class MAMBA              vegasOp
