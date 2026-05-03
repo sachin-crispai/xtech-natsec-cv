@@ -20,7 +20,34 @@ NGINX_CONF_DIR   := /usr/local/etc/nginx
 NGINX_SUBPATH    := natsec
 SERVE_PORT       := 80
 
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := top-ten
+
+# ── Top ten ────────────────────────────────────────────────────────────────────
+.PHONY: top-ten
+top-ten:
+	@echo ""
+	@echo "  NATSEC-CV — Top Ten Commands"
+	@echo "  ════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "  ── Sync + View ──────────────────────────────────────────────"
+	@echo "  1.  make sync-from-link            Pull new photos from iCloud album URL"
+	@echo "  2.  make collect                   Sync + convert HEIC→JPEG in one step"
+	@echo "  3.  make process-videos            Clip + frame-extract new videos"
+	@echo "  4.  make show-gallery              Rebuild gallery + open in Atlas"
+	@echo "  5.  make split-view                Gallery left | iCloud source right in Atlas"
+	@echo ""
+	@echo "  ── Status + Diagnostics ────────────────────────────────────"
+	@echo "  6.  make photo-status PHONE=91     Pipeline audit — counts at every stage"
+	@echo "  7.  make doctor                    Deep stack diagnostic + exact fix commands"
+	@echo ""
+	@echo "  ── Customer Demo (SIERRA) ──────────────────────────────────"
+	@echo "  8.  make sierra-start              Start secure gallery on SIERRA network"
+	@echo "  9.  make add-guest NAME=x PASS=y   Create guest login + QR code"
+	@echo "  10. make revoke-all-guests         Lock gallery after demo"
+	@echo ""
+	@echo "  ════════════════════════════════════════════════════════════"
+	@echo "  Run 'make help' for all commands  |  'make show-notes' for field fixes"
+	@echo ""
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 .PHONY: help
