@@ -205,15 +205,25 @@ serve-setup:
 .PHONY: serve
 serve: build-gallery serve-setup
 	@echo ""
-	@echo "  NATSEC-CV Gallery — nginx LAN server"
+	@sudo $(NGINX_BIN) -s stop -c "$(NGINX_CONF_DIR)/nginx.conf" 2>/dev/null || true
+	@sudo $(NGINX_BIN) -c "$(NGINX_CONF_DIR)/nginx.conf"
+	@echo "  NATSEC-CV Gallery — nginx running in background"
 	@echo "  ─────────────────────────────────────────────────"
 	@echo "  iOS / Safari:  http://$(LAN_HOST)/$(NGINX_SUBPATH)/"
 	@echo "  Android / IP:  http://$(LAN_IP)/$(NGINX_SUBPATH)/"
+	@echo "  Hotspot:       http://xcasa/$(NGINX_SUBPATH)/"
 	@echo "  Mac (Atlas):   file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
 	@echo ""
-	@echo "  Running on port $(SERVE_PORT) — Ctrl+C to stop"
+	@echo "  make serve-stop    — stop nginx"
+	@echo "  make serve-logs    — tail access + error logs"
+	@echo "  make check         — full stack health check"
 	@echo ""
-	sudo $(NGINX_BIN) -g 'daemon off;' -c "$(NGINX_CONF_DIR)/nginx.conf"
+
+.PHONY: serve-logs
+serve-logs:
+	@echo "  Tailing nginx logs (Ctrl+C to stop)..."
+	@echo ""
+	tail -f /usr/local/var/log/nginx/access.log /usr/local/var/log/nginx/error.log
 
 .PHONY: serve-stop
 serve-stop:
