@@ -22,8 +22,9 @@ help:
 	@echo "  make sync-collection     Sync photos from iCloud → inbox/"
 	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "  make collect             sync + ingest in one step"
-	@echo "  make atlas               Build grid gallery + open in Atlas"
-	@echo "  make build-gallery       Regenerate view/index.html grid"
+	@echo "  make atlas               Build gallery + open in Atlas"
+	@echo "  make process-videos      Clip MOVs → H.264 MP4s + extract frames"
+	@echo "  make build-gallery       Regenerate view/index.html (images + video)"
 	@echo "  make open-view           Open view/ in Finder"
 	@echo "  make view-url            Print file:// URL for Atlas / browser"
 	@echo "  make install-deps        Install osxphotos (requires pipx)"
@@ -143,6 +144,10 @@ view-url:
 	@echo ""
 	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
 	@echo ""
+
+.PHONY: process-videos
+process-videos:
+	@bash scripts/process-videos.sh
 
 .PHONY: build-gallery
 build-gallery:
