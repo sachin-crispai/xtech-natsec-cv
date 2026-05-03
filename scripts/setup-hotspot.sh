@@ -62,10 +62,11 @@ echo ""
 echo "  [1/4] Configuring Internet Sharing..."
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkName $HOTSPOT_SSID"       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkPassword $WIFI_PASSWORD"  "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Channel $HOTSPOT_CHANNEL"        "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Channel 0"                       "$PLIST"  # 0 = auto
+/usr/libexec/PlistBuddy -c "Set :NAT:AirPort:40BitEncrypt 0"                  "$PLIST"  # 0 = WPA2 (not WEP)
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 1"                       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:Enabled 1"                               "$PLIST"
-echo "     SSID set to '$HOTSPOT_SSID', password configured."
+echo "     SSID: '$HOTSPOT_SSID' | Encryption: WPA2 | Channel: auto"
 
 # ── Step 2: Start Internet Sharing ────────────────────────────────────────────
 echo "  [2/4] Starting Internet Sharing..."
