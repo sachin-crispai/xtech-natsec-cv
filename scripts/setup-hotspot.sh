@@ -109,9 +109,10 @@ echo ""
 echo "  [1/4] Configuring Internet Sharing plist..."
 
 # Set Ethernet as the internet source (share FROM)
-/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Device $ETH_DEV"              "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Enabled 1"                    "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:PrimaryUserReadable $ETH_NAME" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Device $ETH_DEV"    "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Enabled 1"          "$PLIST"
+# Wrap label in quotes to prevent PlistBuddy truncating multi-word strings
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:PrimaryUserReadable Ethernet" "$PLIST"
 
 # CRITICAL: Remove the Ethernet device from SharingDevices —
 # a device cannot be both the internet source AND a sharing destination.
@@ -145,26 +146,39 @@ ETH_GW=$(netstat -rn -f inet 2>/dev/null | awk -v dev="$ETH_DEV" '$NF==dev && /d
 [ -z "$ETH_GW" ] && ETH_GW=$(netstat -rn | awk '/default.*[0-9]+\.[0-9]+/{print $2; exit}')
 echo "     Ethernet gateway: ${ETH_GW:-unknown}"
 
-# Kill existing InternetSharing cleanly
+# Kill any existing InternetSharing process cleanly
 pkill -x InternetSharing 2>/dev/null || true
 sleep 1
 
-# Unload then reload NetworkSharing launchd daemon
-launchctl unload /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
-sleep 1
-launchctl load   /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
-sleep 1
+# NetworkSharing is OnDemand — 'launchctl load' only registers it, never starts it.
+# Use 'kickstart -k' (kill + force start) to actually run it.
+launchctl kickstart -k system/com.apple.NetworkSharing 2>/dev/null || {
+  # Fallback for older macOS: unload/load + direct binary
+  launchctl unload /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
+  sleep 1
+  launchctl load   /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
+}
+sleep 2
 
-# Launch InternetSharing directly (handles Sequoia)
-/usr/libexec/InternetSharing &
-sleep 5
+# Also launch InternetSharing binary directly as belt-and-suspenders
+if ! pgrep -x InternetSharing >/dev/null 2>&1; then
+  /usr/libexec/InternetSharing &
+  echo "     Started InternetSharing directly (PID $!)"
+fi
+sleep 4
+
+echo "     Internet Sharing started."
 
 # Restore Ethernet default route — Internet Sharing often clobbers it
 if [[ -n "$ETH_GW" ]]; then
-  route delete default 2>/dev/null || true
-  route add default "$ETH_GW" 2>/dev/null \
-    && echo "     Default route restored → $ETH_GW via $ETH_DEV" \
-    || echo "     ⚠  Could not restore route — run: sudo route add default $ETH_GW"
+  if ! netstat -rn -f inet 2>/dev/null | grep -q "^default.*$ETH_GW"; then
+    route delete default 2>/dev/null || true
+    route add default "$ETH_GW" 2>/dev/null \
+      && echo "     Default route restored → $ETH_GW via $ETH_DEV" \
+      || echo "     ⚠  Could not restore route — run: sudo route add default $ETH_GW"
+  else
+    echo "     Default route intact ($ETH_GW) — no fix needed"
+  fi
 fi
 
 # Wait for bridge to get its IP

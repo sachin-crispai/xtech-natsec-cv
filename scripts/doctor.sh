@@ -98,15 +98,16 @@ else
   fix "make hotspot-start   (auto-detects and sets correct Ethernet interface)"
 fi
 
-# Check Ethernet not in SharingDevices (source+destination conflict)
-SHARING_HAS_ETH=$(/usr/libexec/PlistBuddy -c "Print :NAT:SharingDevices" "$PLIST" 2>/dev/null \
-  | grep -c "${ETH_DEV:-en9}" || echo 0)
-if [ "$SHARING_HAS_ETH" = "0" ]; then
-  pass "Ethernet not in SharingDevices (no source/dest conflict)"
-else
+# Check Ethernet (internet source) is NOT in SharingDevices (destination list).
+# Note: en0 (Wi-Fi) IS expected in SharingDevices — macOS adds it to create the AP.
+# Only ETH_DEV (en9) being there is the conflict.
+SHARING_DEVS=$(/usr/libexec/PlistBuddy -c "Print :NAT:SharingDevices" "$PLIST" 2>/dev/null)
+if echo "$SHARING_DEVS" | grep -qF "${ETH_DEV:-en9}"; then
   fail "Ethernet ($ETH_DEV) in SharingDevices AND PrimaryInterface — conflict!"
   info "This is the #1 reason hotspot doesn't broadcast"
   fix "make hotspot-start   (script removes the conflict automatically)"
+else
+  pass "Ethernet ($ETH_DEV) not in SharingDevices (no conflict)"
 fi
 
 # ══════════════════════════════════════════════════════════════
