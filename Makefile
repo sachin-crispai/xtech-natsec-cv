@@ -62,6 +62,8 @@ help:
 	@echo "    make speedtest           Network speed + gallery benchmarks"
 	@echo "    make fix-routes          Fix broken IPv4 routing after hotspot start (safe)"
 	@echo "    make show-notes          Known issues, gotchas, and field fixes"
+	@echo "    make enable-touchid      Use Touch ID fingerprint for all sudo commands"
+	@echo "    make disable-touchid     Revert to password for sudo"
 	@echo ""
 	@echo "  Utilities:"
 	@echo "    make check-deps          Check required tools are installed"
@@ -457,6 +459,55 @@ check:
 	@echo "  Hotspot: http://$(HOTSPOT_IP)/$(NGINX_SUBPATH)/  (IP fallback)"
 	@echo ""
 	@echo "══════════════════════════════════════════"
+	@echo ""
+
+# ── Touch ID for sudo ──────────────────────────────────────────────────────────
+#
+# How it works (macOS Sequoia):
+#   /etc/pam.d/sudo already includes sudo_local (line 1).
+#   sudo_local.template has the Touch ID line commented out.
+#   Creating /etc/pam.d/sudo_local with pam_tid.so uncommented enables Touch ID.
+#   'sufficient' = Touch ID works → done. Touch ID fails / external keyboard → falls
+#   back to password automatically. Safe to use everywhere.
+#   sudo_local survives macOS system updates (unlike editing /etc/pam.d/sudo directly).
+#
+PAM_SUDO_LOCAL := /etc/pam.d/sudo_local
+
+.PHONY: enable-touchid
+enable-touchid:
+	@echo ""
+	@if [ -f "$(PAM_SUDO_LOCAL)" ] && grep -q "^auth.*pam_tid" "$(PAM_SUDO_LOCAL)" 2>/dev/null; then \
+	  echo "  ✓ Touch ID for sudo already enabled — no change needed."; \
+	  echo "  $(PAM_SUDO_LOCAL):"; \
+	  cat "$(PAM_SUDO_LOCAL)" | sed 's/^/    /'; \
+	else \
+	  echo "  Writing $(PAM_SUDO_LOCAL) (requires sudo — touch the sensor or enter password):"; \
+	  echo ""; \
+	  sudo bash -c "printf '# sudo_local: survives macOS updates\nauth       sufficient     pam_tid.so\n' \
+	    > $(PAM_SUDO_LOCAL)"; \
+	  if grep -q "pam_tid" "$(PAM_SUDO_LOCAL)" 2>/dev/null; then \
+	    echo "  ✓ Touch ID enabled for sudo."; \
+	    echo "  File contents:"; \
+	    cat "$(PAM_SUDO_LOCAL)" | sed 's/^/    /'; \
+	    echo ""; \
+	    echo "  All future sudo prompts will use Touch ID."; \
+	    echo "  Falls back to password automatically on external keyboards."; \
+	  else \
+	    echo "  ✗ Failed — file not created. Run manually:"; \
+	    echo "    sudo bash -c \"printf 'auth sufficient pam_tid.so\\\n' > /etc/pam.d/sudo_local\""; \
+	  fi; \
+	fi
+	@echo ""
+
+.PHONY: disable-touchid
+disable-touchid:
+	@echo ""
+	@if [ ! -f "$(PAM_SUDO_LOCAL)" ]; then \
+	  echo "  Touch ID for sudo is not enabled — nothing to do."; \
+	else \
+	  sudo rm -f "$(PAM_SUDO_LOCAL)"; \
+	  echo "  ✓ Touch ID disabled. sudo will prompt for password again."; \
+	fi
 	@echo ""
 
 # ── Route fix ──────────────────────────────────────────────────────────────────
