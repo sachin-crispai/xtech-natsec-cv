@@ -157,6 +157,8 @@ td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-
 <span class="c4">EDGE TIER         BOTTOM &mdash; Drone masters  ~100,000 nodes  Field inference
   edge-00001 &hellip; edge-99999   Standard / Lite / Minimal GPU classes</span></div>
 
+  <div style="page-break-after:always"></div>
+
   <span class="badge bv">VEGAS TIER</span>
   <h3>Global Brain Centers &nbsp;&middot;&nbsp; 2&ndash;3 sites</h3>
   <div class="callout">The apex of the hierarchy. <strong>MEAD</strong> and <strong>POWELL</strong> are H200 super-clusters (16 cards each, 2.2 TB VRAM per site) that train the foundation models powering the entire fleet. Model weights flow downstream to TAHOE-tier controllers via VPN fabric. <strong>mamba</strong> and other operator workstations also live in this tier but are not compute nodes &mdash; they are management interfaces that may be physically anywhere and always connect via VPN.</div>
@@ -167,6 +169,7 @@ td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-
     <tr><td><strong>HAVASU</strong></td><td>8&times; H100 SXM5</td><td>640 GB</td><td>32 PFLOPS</td><td>Tertiary / future site</td></tr>
     <tr><td><strong>mamba</strong></td><td>1&times; RTX 3070 Ti</td><td>8 GB</td><td>&mdash;</td><td>Operator workstation &middot; VPN-only</td></tr>
   </table>
+  <div style="page-break-after:always"></div>
 
   <span class="badge bt">TAHOE TIER</span>
   <h3>Operational Hubs inside SIERRA &nbsp;&middot;&nbsp; ~200 nodes</h3>
@@ -179,6 +182,7 @@ td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-
     <tr><td><strong>BERRYESSA</strong></td><td>4&times; H100 SXM5</td><td>320 GB</td><td>16 PFLOPS</td><td>Southern operational zone</td></tr>
     <tr><td><strong>FOLSOM</strong></td><td>4&times; H100 PCIe</td><td>320 GB</td><td>8 PFLOPS</td><td>Reserve / overflow</td></tr>
   </table>
+  <div style="page-break-after:always"></div>
 
   <span class="badge bs">SUB-CONTROLLERS</span>
   <h3>ALMANOR / DONNER Class &nbsp;&middot;&nbsp; 4&ndash;5 per hub &nbsp;&middot;&nbsp; ~800&ndash;1,000 total</h3>
@@ -192,6 +196,7 @@ td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-
     <tr><td><strong>CONVICT</strong></td><td>1&times; L40S</td><td>48 GB</td><td>Relay / inference</td><td>Convict Lake, CA</td></tr>
     <tr><td><strong>TOPAZ</strong></td><td>1&times; RTX 4090</td><td>24 GB</td><td>Minimal relay</td><td>Topaz Lake, CA/NV</td></tr>
   </table>
+  <div style="page-break-after:always"></div>
 
   <span class="badge be">EDGE TIER</span>
   <h3>Drone Masters &nbsp;&middot;&nbsp; ~100,000 nodes</h3>
@@ -202,6 +207,7 @@ td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-
     <tr><td><strong>Lite</strong></td><td><code>edge-50001 &ndash; 90000</code></td><td>RTX 3070</td><td>8 GB GDDR6</td><td>Backup sub-ctrl</td></tr>
     <tr><td><strong>Minimal</strong></td><td><code>edge-90001 &ndash; 99999</code></td><td>Jetson AGX Orin</td><td>32 GB unified</td><td>Backup sub-ctrl</td></tr>
   </table>
+  <div style="page-break-after:always"></div>
 </div>
 
 
