@@ -28,6 +28,7 @@ help:
 	@echo "NATSEC-CV Makefile"
 	@echo "────────────────────────────────────────────────"
 	@echo "  Collection pipeline:"
+	@echo "    make photo-status        Count photos at every pipeline stage + gap analysis"
 	@echo "    make sync-collection     Sync NEW photos only (incremental)"
 	@echo "    make sync-collection-full  Force re-sync ALL photos"
 	@echo "    make ingest-collection   Convert HEIC→JPEG, generate manifest"
@@ -109,6 +110,13 @@ install-deps:
 	@echo ""
 	@echo "Done. Verify with: osxphotos --version"
 	@echo ""
+
+# ── Photo status ───────────────────────────────────────────────────────────────
+# Pass PHONE=91 to compare against your phone count, e.g: make photo-status PHONE=91
+PHONE ?= unknown
+.PHONY: photo-status
+photo-status:
+	@bash scripts/photo-status.sh "$(PHONE)"
 
 # ── Sync from iCloud ───────────────────────────────────────────────────────────
 .PHONY: sync-collection
