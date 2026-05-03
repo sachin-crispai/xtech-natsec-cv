@@ -17,33 +17,33 @@ graph TD
   classDef vpnNode    fill:#1e1b4b,stroke:#6366f1,stroke-width:1px,color:#e0e7ff
 
   subgraph VEGAS_TIER ["VEGAS TIER - Global Brain Centers  2-3 sites"]
-    MEAD["MEAD<br/>16x NVIDIA H200 SXM5<br/>VRAM: 2.2 TB  BW: 76.8 TB/s<br/>63 PFLOPS FP8<br/>Foundation model training"]
-    POWELL["POWELL<br/>16x NVIDIA H200 SXM5<br/>VRAM: 2.2 TB  BW: 76.8 TB/s<br/>63 PFLOPS FP8<br/>Training and inference"]
-    HAVASU["HAVASU<br/>8x NVIDIA H100 SXM5<br/>VRAM: 640 GB  BW: 26.8 TB/s<br/>32 PFLOPS FP8<br/>Tertiary - future site"]
-    MAMBA["mamba<br/>RTX 3070 Ti  8 GB<br/>Operator workstation<br/>VPN-only  location-agnostic"]
+    MEAD["MEAD<br>16x NVIDIA H200 SXM5<br>VRAM: 2.2 TB  BW: 76.8 TB/s<br>63 PFLOPS FP8<br>Foundation model training"]
+    POWELL["POWELL<br>16x NVIDIA H200 SXM5<br>VRAM: 2.2 TB  BW: 76.8 TB/s<br>63 PFLOPS FP8<br>Training and inference"]
+    HAVASU["HAVASU<br>8x NVIDIA H100 SXM5<br>VRAM: 640 GB  BW: 26.8 TB/s<br>32 PFLOPS FP8<br>Tertiary - future site"]
+    MAMBA["mamba<br>RTX 3070 Ti  8 GB<br>Operator workstation<br>VPN-only  location-agnostic"]
   end
 
   subgraph SIERRA_ZONE ["SIERRA ZONE - Secure Operations  Las Vegas NV"]
-    subgraph TAHOE_TIER ["TAHOE TIER - Operational Hubs  ~200 nodes"]
-      TAHOE["TAHOE  HUB<br/>8x H100 SXM5<br/>640 GB  32 PFLOPS<br/>Central hub - all sync here"]
-      SHASTA["SHASTA<br/>8x H100 SXM5<br/>640 GB  32 PFLOPS<br/>Northern zone"]
-      OROVILLE["OROVILLE<br/>4x H100 SXM5<br/>320 GB  16 PFLOPS<br/>Central zone"]
-      BERRYESSA["BERRYESSA<br/>4x H100 SXM5<br/>320 GB  16 PFLOPS<br/>Southern zone"]
+    subgraph TAHOE_TIER ["TAHOE TIER - Operational Hubs  approx 200 nodes"]
+      TAHOE["TAHOE  HUB<br>8x H100 SXM5<br>640 GB  32 PFLOPS<br>Central hub - all sync here"]
+      SHASTA["SHASTA<br>8x H100 SXM5<br>640 GB  32 PFLOPS<br>Northern zone"]
+      OROVILLE["OROVILLE<br>4x H100 SXM5<br>320 GB  16 PFLOPS<br>Central zone"]
+      BERRYESSA["BERRYESSA<br>4x H100 SXM5<br>320 GB  16 PFLOPS<br>Southern zone"]
     end
 
     subgraph SUB_TIER ["SUB-CONTROLLERS - ALMANOR / DONNER Class  4-5 per hub"]
-      ALMANOR["ALMANOR<br/>2x L40S  96 GB<br/>CV inference<br/>Lake Almanor CA"]
-      DONNER["DONNER<br/>2x L40S  96 GB<br/>CV inference<br/>Donner Lake CA"]
-      TENAYA["TENAYA<br/>2x RTX 6000 Ada  96 GB<br/>Edge aggregation<br/>Tenaya Lake Yosemite"]
-      CASCADE["CASCADE<br/>2x RTX 6000 Ada  96 GB<br/>Edge aggregation<br/>Cascade Lake CA"]
-      CONVICT["CONVICT<br/>1x L40S  48 GB<br/>Relay and inference<br/>Convict Lake CA"]
+      ALMANOR["ALMANOR<br>2x L40S  96 GB<br>CV inference<br>Lake Almanor CA"]
+      DONNER["DONNER<br>2x L40S  96 GB<br>CV inference<br>Donner Lake CA"]
+      TENAYA["TENAYA<br>2x RTX 6000 Ada  96 GB<br>Edge aggregation<br>Tenaya Lake Yosemite"]
+      CASCADE["CASCADE<br>2x RTX 6000 Ada  96 GB<br>Edge aggregation<br>Cascade Lake CA"]
+      CONVICT["CONVICT<br>1x L40S  48 GB<br>Relay and inference<br>Convict Lake CA"]
     end
   end
 
-  subgraph EDGE_TIER ["EDGE TIER - Drone Masters  ~100000 nodes"]
-    EDGE_STD["Standard Class<br/>edge-00001 to edge-50000<br/>1x RTX 4090  24 GB<br/>Swarm control and inference<br/>Failover to backup TAHOE hub"]
-    EDGE_LITE["Lite Class<br/>edge-50001 to edge-90000<br/>1x RTX 3070  8 GB<br/>Inference only<br/>Failover to backup sub-ctrl"]
-    EDGE_MIN["Minimal Class<br/>edge-90001 to edge-99999<br/>Jetson AGX Orin  32 GB<br/>Ultra-light autonomous<br/>Radio mesh or 5G"]
+  subgraph EDGE_TIER ["EDGE TIER - Drone Masters  approx 100000 nodes"]
+    EDGE_STD["Standard Class<br>edge-00001 to edge-50000<br>1x RTX 4090  24 GB<br>Swarm control and inference<br>Failover to backup TAHOE hub"]
+    EDGE_LITE["Lite Class<br>edge-50001 to edge-90000<br>1x RTX 3070  8 GB<br>Inference only<br>Failover to backup sub-ctrl"]
+    EDGE_MIN["Minimal Class<br>edge-90001 to edge-99999<br>Jetson AGX Orin  32 GB<br>Ultra-light autonomous<br>Radio mesh or 5G"]
   end
 
   MEAD   <-->|VPN fabric NDR 400 GbE| TAHOE
@@ -94,7 +94,7 @@ SUB-CONTROLLER TIER — Aggregation and CV inference  ~800-1000 nodes
        |
        |  assigned links  10-25 GbE  radio
        |
-EDGE TIER             BOTTOM — Drone masters  ~100000 nodes  Field inference
+EDGE TIER             BOTTOM — Drone masters  approx 100000 nodes  Field inference
   edge-00001 to edge-99999   Standard / Lite / Minimal GPU classes
 ```
 
@@ -113,7 +113,7 @@ The apex of the hierarchy. MEAD and POWELL are H200 super-clusters (16 cards eac
 | **HAVASU** | 8× H100 SXM5 | 640 GB | 32 PFLOPS | Tertiary / future site |
 | **mamba** | 1× RTX 3070 Ti | 8 GB | — | Operator workstation · VPN-only |
 
-#### TAHOE Tier — Operational Hubs inside SIERRA (~200 nodes)
+#### TAHOE Tier — Operational Hubs inside SIERRA (approx 200 nodes)
 
 The execution layer within the SIERRA secure zone. These nodes coordinate missions, run tactical inference, and manage the EDGE fleet. TAHOE is the central hub — all sub-controllers sync bidirectionally through it. Each hub manages a regional zone of the EDGE fleet.
 
