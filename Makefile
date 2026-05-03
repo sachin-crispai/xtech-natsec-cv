@@ -40,6 +40,7 @@ help:
 	@echo "  Gallery:"
 	@echo "    make show-gallery        Build gallery + open in Atlas (main command)"
 	@echo "    make show-album          Open source iCloud shared album in Atlas"
+	@echo "    make show-arch-pdf       Open SIERRA architecture PDF in Atlas viewer"
 	@echo "    make split-view          Gallery left + iCloud album right in Atlas"
 	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
 	@echo "    make open-view           Open view/ in Finder"
@@ -208,6 +209,19 @@ inbox-status:
 	@echo ""
 
 # ── Gallery ────────────────────────────────────────────────────────────────────
+.PHONY: gen-pdf
+gen-pdf:
+	@echo "  Generating SIERRA-ARCHITECTURE.pdf via Chrome headless..."
+	@"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+	  --headless --disable-gpu \
+	  --print-to-pdf="$(REPO_ROOT)/$(COLLECTION_VIEW)/SIERRA-ARCHITECTURE.pdf" \
+	  --print-to-pdf-no-header \
+	  --no-margins \
+	  "file://$(REPO_ROOT)/docs/architecture/SIERRA-ARCHITECTURE.html" \
+	  2>/dev/null \
+	  && echo "  Done → $(COLLECTION_VIEW)/SIERRA-ARCHITECTURE.pdf" \
+	  || echo "  Failed — is Google Chrome installed?"
+
 .PHONY: build-gallery
 build-gallery:
 	@bash scripts/build-gallery.sh
@@ -220,6 +234,18 @@ split-view: build-gallery
 show-gallery: build-gallery
 	@echo "Opening gallery in Atlas..."
 	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+
+.PHONY: show-arch-pdf
+show-arch-pdf: gen-pdf build-gallery
+	@echo "Opening SIERRA architecture PDF viewer in Atlas..."
+	@if pgrep -x nginx >/dev/null 2>&1; then \
+	  open -a "$(ATLAS_APP)" "http://localhost/$(NGINX_SUBPATH)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"; \
+	else \
+	  echo "  nginx not running — starting it first..."; \
+	  $(MAKE) serve; \
+	  sleep 2; \
+	  open -a "$(ATLAS_APP)" "http://localhost/$(NGINX_SUBPATH)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"; \
+	fi
 
 .PHONY: show-album
 show-album:

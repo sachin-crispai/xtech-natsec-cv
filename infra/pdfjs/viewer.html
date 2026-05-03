@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Viewer — NATSEC-CV</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0a0a0f;color:#e2e2e2;
+  font-family:-apple-system,"Helvetica Neue",sans-serif;font-size:13px}
+
+/* ── Toolbar ── */
+#toolbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;height:46px;
+  background:#16161a;border-bottom:1px solid #2a2a30;
+  display:flex;align-items:center;gap:8px;padding:0 14px;
+}
+#toolbar a{color:#7eb8f7;text-decoration:none;font-size:12px;flex-shrink:0}
+#toolbar a:hover{color:#fff}
+#title{font-weight:600;color:#fff;font-size:12px;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#page-info{color:#555;font-size:12px;min-width:52px;text-align:center;flex-shrink:0}
+.sep{width:1px;height:20px;background:#2a2a34;margin:0 2px;flex-shrink:0}
+
+button{
+  background:#1e1e2a;border:1px solid #2e2e40;color:#aaa;
+  border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;
+  flex-shrink:0;transition:background .12s,color .12s;
+}
+button:hover{background:#28283a;color:#fff}
+button:disabled{opacity:.3;cursor:default}
+button.active{background:#1a3a5c;border-color:#3a7bd5;color:#7eb8f7}
+#zoom-val{color:#555;font-size:12px;min-width:38px;text-align:center;flex-shrink:0}
+
+/* ── View modes ── */
+#viewer{
+  margin-top:46px;padding:16px;
+  display:grid;gap:12px;justify-items:center;
+  justify-content:center;
+  grid-template-columns:1fr;   /* default: single */
+}
+#viewer.mode-2{grid-template-columns:1fr 1fr}
+#viewer.mode-4{grid-template-columns:1fr 1fr}
+
+.page-wrap{
+  background:#fff;border-radius:2px;
+  box-shadow:0 4px 20px rgba(0,0,0,.65);
+  line-height:0;position:relative;
+}
+.page-wrap .pg-num{
+  position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+  font-size:10px;color:#334155;white-space:nowrap;
+}
+canvas{display:block}
+
+/* Status / error */
+#status{
+  position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+  background:#0e1e34;border:1px solid #3a7bd5;color:#7eb8f7;
+  padding:7px 18px;border-radius:20px;font-size:12px;
+  pointer-events:none;display:none;z-index:200;
+}
+#error{
+  margin:60px auto;max-width:460px;text-align:center;
+  background:#1a0808;border:1px solid #7f1d1d;border-radius:8px;
+  padding:24px;color:#fca5a5;display:none;
+}
+#error h2{margin-bottom:8px;color:#f87171}
+#error code{display:block;margin-top:10px;background:#0d0d0f;
+  padding:8px;border-radius:4px;font-size:11px;color:#94a3b8;word-break:break-all}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <a href="../index.html" title="Back to gallery">&#8592; Gallery</a>
+  <div class="sep"></div>
+  <span id="title">Loading…</span>
+
+  <!-- Page nav -->
+  <button id="btn-prev" onclick="navPage(-1)" disabled>&#8592;</button>
+  <span id="page-info">– / –</span>
+  <button id="btn-next" onclick="navPage(1)" disabled>&#8594;</button>
+  <div class="sep"></div>
+
+  <!-- Zoom -->
+  <button onclick="zoom(-0.2)">&#8722;</button>
+  <span id="zoom-val">–</span>
+  <button onclick="zoom(0.2)">+</button>
+  <button onclick="fitWidth()" title="Fit to window width">Fit</button>
+  <div class="sep"></div>
+
+  <!-- View mode -->
+  <button id="btn-1" class="active" onclick="setMode(1,this)"  title="Single page">&#9645; 1</button>
+  <button id="btn-2"               onclick="setMode(2,this)"  title="2-page spread (book view)">&#9645;&#9645; 2</button>
+  <button id="btn-4"               onclick="setMode(4,this)"  title="4-page grid">&#9632; 4</button>
+</div>
+
+<div id="viewer">
+  <div id="status">Loading PDF.js…</div>
+  <div id="error"><h2>Could not render PDF</h2><p id="err-msg"></p><code id="err-url"></code></div>
+</div>
+
+<!-- UMD build: global pdfjsLib, works on http:// and file:// -->
+<script src="./pdf.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+  /* ── Auto-redirect file:// → http:// ─────────────────────────────────────────
+     PDF.js cannot load PDFs via file:// (CORS). If opened that way,
+     redirect to the nginx HTTP URL automatically.                               */
+  if (location.protocol === 'file:') {
+    var httpBase = 'http://localhost/natsec/pdfjs/viewer.html';
+    location.replace(httpBase + location.search);
+    // execution stops here after redirect
+  }
+
+/* ── Config ────────────────────────────────────────────────────────────────── */
+var params  = new URLSearchParams(location.search);
+var fileRel = params.get('file') || '../SIERRA-ARCHITECTURE.pdf';
+var fileAbs = new URL(fileRel, location.href).href;
+
+document.getElementById('title').textContent  = decodeURIComponent(fileRel.split('/').pop());
+document.getElementById('err-url').textContent = fileAbs;
+
+/* ── State ─────────────────────────────────────────────────────────────────── */
+var pdfDoc   = null;
+var scale    = 1.4;
+var viewMode = 1;           // 1 | 2 | 4 pages per "row"
+var firstPage = 1;          // first page currently in view
+
+/* ── Helpers ────────────────────────────────────────────────────────────────── */
+function setStatus(msg){
+  var el = document.getElementById('status');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+function showError(msg){
+  setStatus('');
+  document.getElementById('err-msg').textContent = msg;
+  document.getElementById('error').style.display = 'block';
+}
+
+/* ── Load ───────────────────────────────────────────────────────────────────── */
+if(typeof pdfjsLib === 'undefined'){
+  showError('pdf.min.js not loaded — open via http:// (run: make serve).');
+} else {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+  setStatus('Loading PDF…');
+
+  pdfjsLib.getDocument(fileAbs).promise.then(function(doc){
+    pdfDoc = doc;
+    autoScale();
+    return renderView();
+  }).then(function(){
+    setStatus('');
+    updateNav();
+  }).catch(function(err){
+    showError(err.message || String(err));
+  });
+}
+
+/* ── Auto-scale based on view mode ─────────────────────────────────────────── */
+function autoScale(){
+  if(!pdfDoc) return;
+  pdfDoc.getPage(1).then(function(page){
+    var vp  = page.getViewport({scale:1});
+    var gap = viewMode > 1 ? 12 * viewMode : 0;
+    var avail = window.innerWidth - 40 - gap;
+    scale = Math.max(0.5, (avail / viewMode) / vp.width);
+    document.getElementById('zoom-val').textContent = Math.round(scale*100)+'%';
+  });
+}
+
+/* ── Render current view ────────────────────────────────────────────────────── */
+function renderView(){
+  var viewer = document.getElementById('viewer');
+  document.querySelectorAll('.page-wrap').forEach(function(el){el.remove();});
+
+  // Apply grid class
+  viewer.className = viewMode > 1 ? 'mode-'+viewMode : '';
+
+  // Render viewMode pages starting at firstPage
+  var end = Math.min(firstPage + viewMode - 1, pdfDoc.numPages);
+  var chain = Promise.resolve();
+  for(var p = firstPage; p <= end; p++){
+    (function(num){
+      chain = chain.then(function(){ return renderOnePage(num); });
+    })(p);
+  }
+  return chain;
+}
+
+function renderOnePage(num){
+  return pdfDoc.getPage(num).then(function(page){
+    var vp     = page.getViewport({scale: scale});
+    var canvas = document.createElement('canvas');
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+    var wrap = document.createElement('div');
+    wrap.className = 'page-wrap';
+    wrap.id = 'page-'+num;
+    var lbl = document.createElement('div');
+    lbl.className = 'pg-num';
+    lbl.textContent = 'Page '+num;
+    wrap.appendChild(canvas);
+    wrap.appendChild(lbl);
+    document.getElementById('viewer').appendChild(wrap);
+    return page.render({canvasContext: canvas.getContext('2d'), viewport: vp}).promise;
+  });
+}
+
+/* ── Navigation ─────────────────────────────────────────────────────────────── */
+function updateNav(){
+  var total = pdfDoc ? pdfDoc.numPages : 0;
+  var last  = Math.min(firstPage + viewMode - 1, total);
+  document.getElementById('page-info').textContent =
+    (viewMode > 1 ? firstPage+'-'+last : firstPage) + ' / ' + total;
+  document.getElementById('btn-prev').disabled = (firstPage <= 1);
+  document.getElementById('btn-next').disabled = (firstPage + viewMode - 1 >= total);
+  document.getElementById('zoom-val').textContent = Math.round(scale*100)+'%';
+}
+
+function navPage(delta){
+  if(!pdfDoc) return;
+  var step = viewMode;
+  var next = firstPage + delta * step;
+  next = Math.max(1, Math.min(pdfDoc.numPages, next));
+  firstPage = next;
+  setStatus('Loading…');
+  renderView().then(function(){ setStatus(''); updateNav(); });
+}
+window.navPage = navPage;
+
+/* ── Zoom ────────────────────────────────────────────────────────────────────── */
+function zoom(delta){
+  scale = Math.max(0.3, Math.min(4, scale + delta));
+  rerender();
+}
+function fitWidth(){
+  if(!pdfDoc) return;
+  pdfDoc.getPage(1).then(function(page){
+    var vp   = page.getViewport({scale:1});
+    var gap  = viewMode > 1 ? 12*(viewMode-1) : 0;
+    var avail = window.innerWidth - 40 - gap;
+    scale = Math.max(0.3, (avail / viewMode) / vp.width);
+    rerender();
+  });
+}
+function rerender(){
+  if(!pdfDoc) return;
+  setStatus('Re-rendering…');
+  renderView().then(function(){ setStatus(''); updateNav(); });
+}
+window.zoom = zoom;
+window.fitWidth = fitWidth;
+
+/* ── View mode toggle ────────────────────────────────────────────────────────── */
+function setMode(n, btn){
+  viewMode  = n;
+  firstPage = 1;
+  // Snap firstPage to mode boundary
+  document.querySelectorAll('#toolbar button.active').forEach(function(b){
+    if(['btn-1','btn-2','btn-4'].indexOf(b.id) !== -1) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  autoScale();
+  setTimeout(function(){
+    setStatus('Loading…');
+    renderView().then(function(){ setStatus(''); updateNav(); });
+  }, 50);
+}
+window.setMode = setMode;
+
+/* ── Keyboard shortcuts ──────────────────────────────────────────────────────── */
+document.addEventListener('keydown', function(e){
+  if(e.key === 'ArrowRight' || e.key === 'ArrowDown') navPage(1);
+  if(e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navPage(-1);
+  if(e.key === '1') setMode(1, document.getElementById('btn-1'));
+  if(e.key === '2') setMode(2, document.getElementById('btn-2'));
+  if(e.key === '4') setMode(4, document.getElementById('btn-4'));
+  if(e.key === '+' || e.key === '=') zoom(0.2);
+  if(e.key === '-') zoom(-0.2);
+  if(e.key === 'f' || e.key === 'F') fitWidth();
+});
+
+})();
+</script>
+</body>
+</html>

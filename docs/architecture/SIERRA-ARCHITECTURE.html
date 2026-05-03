@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIERRA Control Center — Architecture</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0a0f;color:#e2e2e2;font-family:-apple-system,"Helvetica Neue",sans-serif;font-size:13px}
+.page{min-height:100vh;padding:32px 40px 40px;border-bottom:3px solid #1a1a28}
+.page-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#334155;margin-bottom:6px}
+h1{font-size:22px;font-weight:700;color:#fff;margin-bottom:4px}
+.subtitle{color:#4a4a60;font-size:12px;margin-bottom:28px}
+h2{font-size:14px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;margin:28px 0 12px}
+h3{font-size:13px;font-weight:600;margin:20px 0 8px}
+p{color:#94a3b8;line-height:1.7;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:12px}
+th{background:#111118;color:#7eb8f7;padding:7px 12px;text-align:left;border-bottom:2px solid #1e1e30;font-size:10px;text-transform:uppercase;letter-spacing:.07em}
+td{padding:7px 12px;border-bottom:1px solid #16161e;color:#b0b0c0;vertical-align:top}
+tr:hover td{background:#0e0e16}
+td strong{color:#e2e2e2}
+td code{background:#1a1a28;border-radius:3px;padding:1px 5px;color:#7dd3fc;font-size:11px}
+
+/* DIAGRAM */
+.diagram{display:flex;flex-direction:column;gap:0}
+.tier-row{display:flex;align-items:stretch;margin-bottom:0}
+.tier-label{writing-mode:vertical-rl;transform:rotate(180deg);width:34px;min-height:80px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;flex-shrink:0;border-radius:6px 0 0 6px}
+.tier-nodes{flex:1;display:flex;flex-wrap:wrap;gap:8px;padding:12px 12px 12px 14px;border-radius:0 8px 8px 0}
+.vegas .tier-label{background:#3b0764;color:#d8b4fe}
+.vegas .tier-nodes{background:#1a0533;border:1px solid #6d28d9;border-left:none}
+.tahoe .tier-label{background:#0c1a2e;color:#7dd3fc}
+.tahoe .tier-nodes{background:#050d1a;border:1px solid #0369a1;border-left:none}
+.sub   .tier-label{background:#052e16;color:#86efac}
+.sub   .tier-nodes{background:#021a0d;border:1px solid #166534;border-left:none}
+.edge  .tier-label{background:#431407;color:#fb923c}
+.edge  .tier-nodes{background:#220a04;border:1px solid #9a3412;border-left:none}
+.node{border-radius:6px;padding:8px 11px;min-width:130px;flex:1}
+.node .node-name{font-weight:700;font-size:12px;margin-bottom:3px}
+.node .node-spec{font-size:10px;line-height:1.5;opacity:.8}
+.nv{background:#2e1065;border:1px solid #7c3aed;color:#ede9fe}.nv .node-name{color:#c4b5fd}
+.nm{background:#1e1b4b;border:1px solid #4f46e5;color:#c7d2fe}.nm .node-name{color:#a5b4fc}
+.nh{background:#0a2640;border:2px solid #0ea5e9;color:#e0f2fe}.nh .node-name{color:#38bdf8}
+.nt{background:#0c1f36;border:1px solid #0369a1;color:#bae6fd}.nt .node-name{color:#7dd3fc}
+.ns{background:#052e16;border:1px solid #15803d;color:#dcfce7}.ns .node-name{color:#4ade80}
+.ne1{background:#3d1206;border:1px solid #c2410c;color:#fed7aa}.ne1 .node-name{color:#fb923c}
+.ne2{background:#292524;border:1px solid #92400e;color:#fde68a}.ne2 .node-name{color:#fbbf24}
+.ne3{background:#1c1917;border:1px solid #57534e;color:#e7e5e4}.ne3 .node-name{color:#a8a29e}
+.conn{display:flex;align-items:center;justify-content:center;padding:5px 0;margin-left:34px;position:relative}
+.conn::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:2px;background:#1e293b}
+.conn-lbl{position:relative;z-index:1;background:#0d1117;border:1px solid #1e293b;border-radius:20px;padding:2px 14px;font-size:10px;color:#475569;letter-spacing:.04em}
+.zone{border:1px solid #1e3a5f;border-radius:8px;padding:8px;margin:4px 0;background:#030d1a}
+.zone-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#1d4ed8;margin-bottom:8px;padding:3px 8px;display:inline-block}
+
+/* PAGE 2+3 */
+.badge{display:inline-block;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.04em;margin-right:8px;margin-bottom:10px}
+.bv{background:#4c1d95;color:#ddd6fe}
+.bt{background:#0c4a6e;color:#bae6fd}
+.bs{background:#14532d;color:#bbf7d0}
+.be{background:#7c2d12;color:#fed7aa}
+.callout{border-left:3px solid #334155;background:#0d1117;border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:16px;color:#94a3b8;line-height:1.7}
+.callout strong{color:#e2e2e2}
+.hier{background:#0d1117;border:1px solid #1e293b;border-radius:8px;padding:16px 20px;font-family:"SF Mono","Fira Code",monospace;font-size:11px;line-height:1.9;margin-bottom:28px;overflow-x:auto;color:#475569}
+.c1{color:#a855f7;font-weight:bold}
+.c2{color:#38bdf8;font-weight:bold}
+.c3{color:#4ade80}
+.c4{color:#f97316}
+.footer{color:#1e293b;font-size:11px;text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: DIAGRAM -->
+<div class="page">
+  <p class="page-title">Page 1 of 3 — Architecture Diagram</p>
+  <h1>SIERRA Control Center</h1>
+  <p class="subtitle">Four-tier distributed compute and drone operations &nbsp;·&nbsp; 810-26-NATSEC-CV &nbsp;·&nbsp; 2026-05-03</p>
+
+  <div class="diagram">
+    <div class="tier-row vegas">
+      <div class="tier-label">VEGAS TIER</div>
+      <div class="tier-nodes">
+        <div class="node nv"><div class="node-name">MEAD</div><div class="node-spec">16x H200 SXM5<br>2.2 TB VRAM &middot; 63 PFLOPS FP8<br>Primary brain &middot; Foundation training</div></div>
+        <div class="node nv"><div class="node-name">POWELL</div><div class="node-spec">16x H200 SXM5<br>2.2 TB VRAM &middot; 63 PFLOPS FP8<br>Secondary brain &middot; Training + inference</div></div>
+        <div class="node nv"><div class="node-name">HAVASU</div><div class="node-spec">8x H100 SXM5<br>640 GB VRAM &middot; 32 PFLOPS FP8<br>Tertiary &middot; Future site</div></div>
+        <div class="node nm"><div class="node-name">mamba</div><div class="node-spec">RTX 3070 Ti &middot; 8 GB<br>Operator workstation<br>VPN-only &middot; location-agnostic</div></div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="conn-lbl">VPN fabric &middot; NDR/HDR InfiniBand &middot; encrypted</span></div>
+
+    <div class="zone">
+      <div class="zone-lbl">&#128274; SIERRA ZONE &mdash; Secure Operations &middot; Las Vegas, NV</div>
+
+      <div class="tier-row tahoe">
+        <div class="tier-label">TAHOE TIER</div>
+        <div class="tier-nodes">
+          <div class="node nh"><div class="node-name">&#11088; TAHOE HUB</div><div class="node-spec">8x H100 SXM5 &middot; 640 GB<br>32 PFLOPS FP8<br>Central hub &mdash; all sync here</div></div>
+          <div class="node nt"><div class="node-name">SHASTA</div><div class="node-spec">8x H100 SXM5 &middot; 640 GB<br>32 PFLOPS FP8 &middot; Northern zone</div></div>
+          <div class="node nt"><div class="node-name">OROVILLE</div><div class="node-spec">4x H100 SXM5 &middot; 320 GB<br>16 PFLOPS FP8 &middot; Central zone</div></div>
+          <div class="node nt"><div class="node-name">BERRYESSA</div><div class="node-spec">4x H100 SXM5 &middot; 320 GB<br>16 PFLOPS FP8 &middot; Southern zone</div></div>
+          <div class="node nt"><div class="node-name">FOLSOM</div><div class="node-spec">4x H100 PCIe &middot; 320 GB<br>8 PFLOPS FP8 &middot; Reserve</div></div>
+        </div>
+      </div>
+
+      <div class="conn"><span class="conn-lbl">bidirectional sync &middot; InfiniBand HDR 200 Gb/s</span></div>
+
+      <div class="tier-row sub">
+        <div class="tier-label">SUB-CTRL</div>
+        <div class="tier-nodes">
+          <div class="node ns"><div class="node-name">ALMANOR</div><div class="node-spec">2x L40S &middot; 96 GB<br>CV inference</div></div>
+          <div class="node ns"><div class="node-name">DONNER</div><div class="node-spec">2x L40S &middot; 96 GB<br>CV inference</div></div>
+          <div class="node ns"><div class="node-name">TENAYA</div><div class="node-spec">2x RTX 6000 Ada &middot; 96 GB<br>Edge aggregation</div></div>
+          <div class="node ns"><div class="node-name">CASCADE</div><div class="node-spec">2x RTX 6000 Ada &middot; 96 GB<br>Edge aggregation</div></div>
+          <div class="node ns"><div class="node-name">CONVICT</div><div class="node-spec">1x L40S &middot; 48 GB<br>Relay + inference</div></div>
+          <div class="node ns"><div class="node-name">TOPAZ</div><div class="node-spec">1x RTX 4090 &middot; 24 GB<br>Minimal relay</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conn"><span class="conn-lbl">assigned links &middot; 10&ndash;25 GbE &middot; radio &middot; failover on loss</span></div>
+
+    <div class="tier-row edge">
+      <div class="tier-label">EDGE TIER</div>
+      <div class="tier-nodes">
+        <div class="node ne1"><div class="node-name">Standard Class</div><div class="node-spec">edge-00001 &mdash; 50000<br>RTX 4090 &middot; 24 GB<br>Swarm control + inference</div></div>
+        <div class="node ne2"><div class="node-name">Lite Class</div><div class="node-spec">edge-50001 &mdash; 90000<br>RTX 3070 &middot; 8 GB<br>Inference only</div></div>
+        <div class="node ne3"><div class="node-name">Minimal Class</div><div class="node-spec">edge-90001 &mdash; 99999<br>Jetson AGX Orin &middot; 32 GB<br>Autonomous &middot; radio mesh</div></div>
+      </div>
+    </div>
+  </div>
+  <p class="footer">Source: sierra-whiteboard-sketch.jpg &middot; 810-26-NATSEC-CV &middot; 2026-05-03</p>
+</div>
+
+
+<!-- PAGE 2: TIER DEFINITIONS -->
+<div class="page">
+  <p class="page-title">Page 2 of 3 &mdash; Tier Definitions</p>
+  <h1>Tier Definitions</h1>
+  <p class="subtitle">Four-tier hierarchy &mdash; from global brain to field edge</p>
+
+  <div class="hier">
+<span class="c1">VEGAS TIER        TOP &mdash; Global brain  H200 clusters  Foundation model training
+  MEAD &middot; POWELL &middot; HAVASU     2&ndash;3 sites globally &middot; 63 PFLOPS each &middot; 2.2 TB VRAM</span>
+       |
+       |  VPN fabric (WireGuard / IPSec &middot; mutual cert auth)
+       |
+<span class="c2">TAHOE TIER  &mdash; Operational control  ~200 H100 nodes  Mission execution
+  TAHOE (hub) &middot; SHASTA &middot; OROVILLE &middot; BERRYESSA &middot; FOLSOM</span>
+       |
+       |  InfiniBand HDR 200 Gb/s
+       |
+<span class="c3">SUB-CONTROLLER TIER  &mdash; Aggregation + CV inference  ~800&ndash;1000 nodes
+  ALMANOR &middot; DONNER &middot; TENAYA &middot; CASCADE &middot; CONVICT &middot; TOPAZ</span>
+       |
+       |  10&ndash;25 GbE / radio &middot; failover on primary loss
+       |
+<span class="c4">EDGE TIER         BOTTOM &mdash; Drone masters  ~100,000 nodes  Field inference
+  edge-00001 &hellip; edge-99999   Standard / Lite / Minimal GPU classes</span></div>
+
+  <div style="page-break-after:always"></div>
+
+  <span class="badge bv">VEGAS TIER</span>
+  <h3>Global Brain Centers &nbsp;&middot;&nbsp; 2&ndash;3 sites</h3>
+  <div class="callout">The apex of the hierarchy. <strong>MEAD</strong> and <strong>POWELL</strong> are H200 super-clusters (16 cards each, 2.2 TB VRAM per site) that train the foundation models powering the entire fleet. Model weights flow downstream to TAHOE-tier controllers via VPN fabric. <strong>mamba</strong> and other operator workstations also live in this tier but are not compute nodes &mdash; they are management interfaces that may be physically anywhere and always connect via VPN.</div>
+  <table>
+    <tr><th>Node</th><th>GPU</th><th>VRAM</th><th>FLOPS (FP8)</th><th>Role</th></tr>
+    <tr><td><strong>MEAD</strong></td><td>16&times; H200 SXM5</td><td>2.2 TB</td><td>63 PFLOPS</td><td>Primary brain &mdash; foundation training</td></tr>
+    <tr><td><strong>POWELL</strong></td><td>16&times; H200 SXM5</td><td>2.2 TB</td><td>63 PFLOPS</td><td>Secondary brain &mdash; training + inference</td></tr>
+    <tr><td><strong>HAVASU</strong></td><td>8&times; H100 SXM5</td><td>640 GB</td><td>32 PFLOPS</td><td>Tertiary / future site</td></tr>
+    <tr><td><strong>mamba</strong></td><td>1&times; RTX 3070 Ti</td><td>8 GB</td><td>&mdash;</td><td>Operator workstation &middot; VPN-only</td></tr>
+  </table>
+  <div style="page-break-after:always"></div>
+
+  <span class="badge bt">TAHOE TIER</span>
+  <h3>Operational Hubs inside SIERRA &nbsp;&middot;&nbsp; ~200 nodes</h3>
+  <div class="callout">The execution layer within the SIERRA secure zone. These nodes coordinate missions, run tactical inference, and manage the EDGE fleet. <strong>TAHOE</strong> is the central hub &mdash; all sub-controllers sync bidirectionally through it. Each hub manages a regional zone of the EDGE fleet.</div>
+  <table>
+    <tr><th>Node</th><th>GPU</th><th>VRAM</th><th>FLOPS</th><th>Zone</th></tr>
+    <tr><td><strong>TAHOE &#11088;</strong></td><td>8&times; H100 SXM5</td><td>640 GB</td><td>32 PFLOPS</td><td>Hub &mdash; all sync through here</td></tr>
+    <tr><td><strong>SHASTA</strong></td><td>8&times; H100 SXM5</td><td>640 GB</td><td>32 PFLOPS</td><td>Northern operational zone</td></tr>
+    <tr><td><strong>OROVILLE</strong></td><td>4&times; H100 SXM5</td><td>320 GB</td><td>16 PFLOPS</td><td>Central operational zone</td></tr>
+    <tr><td><strong>BERRYESSA</strong></td><td>4&times; H100 SXM5</td><td>320 GB</td><td>16 PFLOPS</td><td>Southern operational zone</td></tr>
+    <tr><td><strong>FOLSOM</strong></td><td>4&times; H100 PCIe</td><td>320 GB</td><td>8 PFLOPS</td><td>Reserve / overflow</td></tr>
+  </table>
+  <div style="page-break-after:always"></div>
+
+  <span class="badge bs">SUB-CONTROLLERS</span>
+  <h3>ALMANOR / DONNER Class &nbsp;&middot;&nbsp; 4&ndash;5 per hub &nbsp;&middot;&nbsp; ~800&ndash;1,000 total</h3>
+  <div class="callout">Named after small Sierran alpine lakes. These nodes sit between TAHOE hubs and the raw EDGE fleet. They perform CV inference pre-processing, aggregate sensor data, and serve as the first failover target when an EDGE node loses its primary. GPU class is L40S or RTX 6000 Ada &mdash; CV-optimized, not training-capable.</div>
+  <table>
+    <tr><th>Node</th><th>GPU</th><th>VRAM</th><th>Role</th><th>Lake</th></tr>
+    <tr><td><strong>ALMANOR</strong></td><td>2&times; L40S</td><td>96 GB</td><td>CV inference</td><td>Lake Almanor, CA</td></tr>
+    <tr><td><strong>DONNER</strong></td><td>2&times; L40S</td><td>96 GB</td><td>CV inference</td><td>Donner Lake, CA</td></tr>
+    <tr><td><strong>TENAYA</strong></td><td>2&times; RTX 6000 Ada</td><td>96 GB</td><td>Edge aggregation</td><td>Tenaya Lake, Yosemite</td></tr>
+    <tr><td><strong>CASCADE</strong></td><td>2&times; RTX 6000 Ada</td><td>96 GB</td><td>Edge aggregation</td><td>Cascade Lake, CA</td></tr>
+    <tr><td><strong>CONVICT</strong></td><td>1&times; L40S</td><td>48 GB</td><td>Relay / inference</td><td>Convict Lake, CA</td></tr>
+    <tr><td><strong>TOPAZ</strong></td><td>1&times; RTX 4090</td><td>24 GB</td><td>Minimal relay</td><td>Topaz Lake, CA/NV</td></tr>
+  </table>
+  <div style="page-break-after:always"></div>
+
+  <span class="badge be">EDGE TIER</span>
+  <h3>Drone Masters &nbsp;&middot;&nbsp; ~100,000 nodes</h3>
+  <div class="callout">The leaves of the hierarchy. Each EDGE drone master controls a local swarm, runs real-time inference, and reports status upstream. On loss of primary controller it automatically fails over to its pre-assigned backup, syncs operational state, and continues the mission.</div>
+  <table>
+    <tr><th>Class</th><th>Range</th><th>GPU</th><th>VRAM</th><th>Failover target</th></tr>
+    <tr><td><strong>Standard</strong></td><td><code>edge-00001 &ndash; 50000</code></td><td>RTX 4090</td><td>24 GB GDDR6X</td><td>Backup TAHOE hub</td></tr>
+    <tr><td><strong>Lite</strong></td><td><code>edge-50001 &ndash; 90000</code></td><td>RTX 3070</td><td>8 GB GDDR6</td><td>Backup sub-ctrl</td></tr>
+    <tr><td><strong>Minimal</strong></td><td><code>edge-90001 &ndash; 99999</code></td><td>Jetson AGX Orin</td><td>32 GB unified</td><td>Backup sub-ctrl</td></tr>
+  </table>
+  <div style="page-break-after:always"></div>
+</div>
+
+
+<!-- PAGE 3: GLOSSARY -->
+<div class="page">
+  <p class="page-title">Page 3 of 3 &mdash; Glossary</p>
+  <h1>Glossary</h1>
+  <p class="subtitle">Key terms for the SIERRA control center architecture</p>
+
+  <table>
+    <tr><th style="width:22%">Term</th><th>Definition</th></tr>
+    <tr><td><strong>SIERRA</strong></td><td>The physically and logically isolated secure zone in Las Vegas, NV. All operational compute lives inside SIERRA. Entry requires VPN authentication regardless of the physical location of the connecting node.</td></tr>
+    <tr><td><strong>VEGAS Tier</strong></td><td>The global brain &mdash; 2&ndash;3 geographically distributed H200 training clusters outside SIERRA, connected via VPN. Trains foundation models and pushes weights downstream. Top of the hierarchy.</td></tr>
+    <tr><td><strong>TAHOE Tier</strong></td><td>Operational hub-level controllers inside SIERRA. ~200 H100 nodes. Coordinate missions, run tactical inference, manage the EDGE fleet. TAHOE is the central hub all sub-controllers sync through.</td></tr>
+    <tr><td><strong>Sub-Controller</strong></td><td>Intermediate layer (ALMANOR/DONNER class) between TAHOE hubs and EDGE nodes. Aggregates sensor data, runs CV inference pre-processing, and serves as first failover target for EDGE nodes. L40S / RTX 6000 Ada class &mdash; not training-capable.</td></tr>
+    <tr><td><strong>EDGE Tier</strong></td><td>~100,000 drone master nodes at field periphery. Limited GPU (inference only). Each is assigned a primary and backup controller. Operates autonomously during connectivity gaps and fails over automatically.</td></tr>
+    <tr><td><strong>mamba</strong></td><td>Operator workstation in the VEGAS tier. May be physically anywhere &mdash; inside the Vegas center, hotel, or field. Not a compute node. Always VPN regardless of location.</td></tr>
+    <tr><td><strong>VPN Fabric</strong></td><td>Encrypted tunnel linking VEGAS brain centers to SIERRA. Mutual certificate authentication. All cross-boundary traffic traverses this path.</td></tr>
+    <tr><td><strong>Failover</strong></td><td>When an EDGE node loses heartbeat with its primary controller: retry (N times) &rarr; promote backup controller &rarr; sync operational state &rarr; continue mission under backup custody.</td></tr>
+    <tr><td><strong>Custody Transfer</strong></td><td>Hand-off of an EDGE node&rsquo;s swarm assignment from one controller to another. Triggered automatically on failover, or manually by an operator when a primary controller recovers.</td></tr>
+    <tr><td><strong>NDR / HDR</strong></td><td>InfiniBand network generations. NDR (Next Data Rate) = 400 Gb/s &mdash; used in VEGAS clusters. HDR (High Data Rate) = 200 Gb/s &mdash; used in SIERRA TAHOE clusters.</td></tr>
+    <tr><td><strong>NVLink 4</strong></td><td>NVIDIA high-bandwidth GPU-to-GPU interconnect inside H200 nodes. Enables full memory sharing across all 16 GPUs in MEAD/POWELL configurations (~900 GB/s per direction).</td></tr>
+    <tr><td><strong>PFLOPS FP8</strong></td><td>Peta (10&sup1;&sup5;) floating-point operations per second at 8-bit precision. Standard AI training throughput metric. H200 SXM5 delivers ~3.96 PFLOPS FP8 per card.</td></tr>
+    <tr><td><strong>Node naming</strong></td><td>Western lakes convention. VEGAS tier: large Nevada/Arizona reservoirs (MEAD, POWELL, HAVASU). TAHOE tier: large California lakes (SHASTA, OROVILLE, BERRYESSA, FOLSOM). Sub-controllers: small Sierran alpine lakes (ALMANOR, DONNER, TENAYA, CASCADE, CONVICT, TOPAZ).</td></tr>
+    <tr><td><strong>Autonomous floor</strong></td><td>Minimum operational capability an EDGE node maintains when fully disconnected from SIERRA &mdash; local inference on existing models, swarm cohesion, and event logging for later sync.</td></tr>
+  </table>
+
+  <p class="footer">SIERRA Control Center &middot; 810-26-NATSEC-CV &middot; 2026-05-03 &middot; source: sierra-whiteboard-sketch.jpg</p>
+</div>
+
+</body>
+</html>
