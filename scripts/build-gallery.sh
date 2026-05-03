@@ -46,7 +46,7 @@ for C in "${CLIPS[@]}"; do
   # Thumbnail fallback: show first frame if extracted, else video poster
   VIDEO_CARDS+="<video src=\"clips/$C\" preload=\"metadata\" muted loop"
   VIDEO_CARDS+=" onmouseenter=\"this.play()\" onmouseleave=\"this.pause();this.currentTime=0\""
-  VIDEO_CARDS+=" poster=\"$THUMB\"></video>"
+  VIDEO_CARDS+=" poster=\"$THUMB\" class=\"gallery-video\"></video>"
   VIDEO_CARDS+="<div class=\"badge-video\">▶ MP4 · H.264</div>"
   VIDEO_CARDS+="<div class=\"label\"><span class=\"idx\">#${VIDX}</span>$C</div>"
   VIDEO_CARDS+="</div>\n"
@@ -236,6 +236,8 @@ cat > "$OUT" <<HTMLEOF
   <button onclick="clearSel()">Clear</button>
   <button onclick="copySelected()">Copy names</button>
   <div class="sep"></div>
+  <button id="mute-btn" onclick="toggleMute(this)" title="Videos start muted — click to unmute all">&#128263; Muted</button>
+  <div class="sep"></div>
   <div class="size-btns">
     <button onclick="setSize(140,this)">S</button>
     <button onclick="setSize(220,this)" id="sz-m" class="active">M</button>
@@ -367,6 +369,7 @@ function openLightboxImg(src, name) {
 function openLightboxVid(src, name) {
   const v = document.getElementById('lb-vid');
   v.src = src; v.style.display = '';
+  v.muted = globalMuted;
   document.getElementById('lb-img').style.display = 'none';
   document.getElementById('lightbox-name').textContent = name;
   document.getElementById('lightbox').classList.add('open');
@@ -383,6 +386,18 @@ function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── Mute / unmute all videos ───────────────────────────────────────────────
+let globalMuted = true;
+
+function toggleMute(btn) {
+  globalMuted = !globalMuted;
+  document.querySelectorAll('video.gallery-video').forEach(v => { v.muted = globalMuted; });
+  document.getElementById('lb-vid').muted = globalMuted;
+  btn.innerHTML = globalMuted ? '&#128263; Muted' : '&#128266; Unmuted';
+  btn.classList.toggle('active', !globalMuted);
+  toast(globalMuted ? 'Videos muted' : 'Videos unmuted — hover a clip to hear audio');
 }
 </script>
 </body>

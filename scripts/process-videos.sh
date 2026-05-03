@@ -105,7 +105,7 @@ while IFS= read -r VIDEO; do
         $SCALE_FILTER \
         -c:v libx264 -preset fast -crf 23 \
         -b:v 1200k -maxrate 1500k -bufsize 3000k \
-        -an \
+        -c:a aac -b:a 128k \
         -movflags +faststart \
         "$CLIP_OUT" 2>/dev/null
       SIZE=$(du -sh "$CLIP_OUT" | cut -f1)
