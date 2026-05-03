@@ -50,21 +50,27 @@ if $STOP; then
 fi
 
 # ── Detect Ethernet interface ──────────────────────────────────────────────────
-# Maps human-readable service names to BSD device names
+# Finds the first Ethernet-class interface with active link + IP.
+# Works regardless of adapter slot, port number, or brand.
 detect_ethernet() {
-  local services=("Display Ethernet" "USB 10/100/1000 LAN" "Thunderbolt Ethernet Slot 1, Port 2" "Thunderbolt Ethernet Slot 2, Port 1")
-  for svc in "${services[@]}"; do
-    local dev
-    dev=$(networksetup -listallhardwareports 2>/dev/null \
-      | awk -v s="$svc" '/Hardware Port:/{port=$0} /Device:/{if(port ~ s) print $2}' | head -1)
-    if [[ -n "$dev" ]]; then
-      local ip
-      ip=$(ipconfig getifaddr "$dev" 2>/dev/null || true)
-      if [[ -n "$ip" ]]; then
-        echo "$dev"
-        return 0
-      fi
-    fi
+  # Get all BSD device names for hardware ports containing "Ethernet"
+  local devs
+  devs=$(networksetup -listallhardwareports 2>/dev/null \
+    | awk '/Hardware Port:.*[Ee]thernet/{found=1} found && /Device:/{print $2; found=0}')
+
+  for dev in $devs; do
+    # Must have active link (cable physically plugged in)
+    local link
+    link=$(ifconfig "$dev" 2>/dev/null | grep -o 'status: [a-z]*' | awk '{print $2}')
+    [[ "$link" != "active" ]] && continue
+
+    # Must have an IP address
+    local ip
+    ip=$(ipconfig getifaddr "$dev" 2>/dev/null || true)
+    [[ -z "$ip" ]] && continue
+
+    echo "$dev"
+    return 0
   done
   return 1
 }
