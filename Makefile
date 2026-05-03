@@ -7,6 +7,8 @@ COLLECTION_INBOX := platform/collection/inbox
 COLLECTION_PROC  := platform/collection/processed
 COLLECTION_VIEW  := platform/collection/view
 ATLAS_APP        := ChatGPT Atlas
+SERVE_PORT       := 8080
+LAN_HOST         := mamba.local
 ALBUM_NAME       := 810-26-NATSEC-CV
 PHOTOS_LIBRARY   := /Volumes/GENAI/SUCHIR/autopsy.photoslibrary
 ICLOUD_DRIVE     := $(HOME)/Library/Mobile Documents/com~apple~CloudDocs
@@ -23,6 +25,7 @@ help:
 	@echo "  make ingest-collection   Convert HEIC→JPEG, generate manifest"
 	@echo "  make collect             sync + ingest in one step"
 	@echo "  make atlas               Build gallery + open in Atlas"
+	@echo "  make serve               Serve gallery on LAN — open on phone at mamba.local:8080"
 	@echo "  make process-videos      Clip MOVs → H.264 MP4s + extract frames"
 	@echo "  make build-gallery       Regenerate view/index.html (images + video)"
 	@echo "  make open-view           Open view/ in Finder"
@@ -144,6 +147,19 @@ view-url:
 	@echo ""
 	@echo "  $(shell ls "$(COLLECTION_VIEW)" 2>/dev/null | wc -l | tr -d ' ') files — JPEGs and PNGs only, no originals, no video."
 	@echo ""
+
+.PHONY: serve
+serve: build-gallery
+	@echo ""
+	@echo "  NATSEC-CV Gallery — local network server"
+	@echo "  ────────────────────────────────────────"
+	@echo "  Mac  (Atlas):  file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+	@echo "  Phone/browser: http://$(LAN_HOST):$(SERVE_PORT)"
+	@echo "  IP fallback:   http://$(shell ipconfig getifaddr en0 2>/dev/null || echo '10.0.0.66'):$(SERVE_PORT)"
+	@echo ""
+	@echo "  Serving $(COLLECTION_VIEW)/ — Ctrl+C to stop"
+	@echo ""
+	cd "$(COLLECTION_VIEW)" && python3 -m http.server $(SERVE_PORT) --bind 0.0.0.0
 
 .PHONY: process-videos
 process-videos:
