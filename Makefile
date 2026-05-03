@@ -46,6 +46,11 @@ help:
 	@echo "    make serve-status        Show nginx state + reachability URLs"
 	@echo "    make serve-setup         Copy infra/nginx/ configs → nginx conf dir"
 	@echo ""
+	@echo "  Hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
+	@echo "    make hotspot-start       Create 'natsec' Wi-Fi hotspot + xcasa DNS"
+	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
+	@echo "    make hotspot-status      Show hotspot state and connected clients"
+	@echo ""
 	@echo "  Utilities:"
 	@echo "    make install-deps        Install osxphotos (requires pipx)"
 	@echo "    make check-deps          Check required tools are present"
@@ -236,6 +241,47 @@ serve-status:
 	@echo ""
 	@echo "  Logs:"
 	@echo "    tail -f /usr/local/var/log/nginx/error.log"
+	@echo ""
+
+# ── Hotspot ────────────────────────────────────────────────────────────────────
+HOTSPOT_SSID     := natsec
+HOTSPOT_PASSWORD := natsec2026
+HOTSPOT_IP       := 192.168.2.1
+
+.PHONY: hotspot-start
+hotspot-start: serve-setup
+	@echo ""
+	@echo "  Starting natsec hotspot (requires sudo)..."
+	sudo bash scripts/setup-hotspot.sh --password "$(HOTSPOT_PASSWORD)"
+
+.PHONY: hotspot-stop
+hotspot-stop:
+	@echo ""
+	@echo "  Stopping natsec hotspot..."
+	sudo bash scripts/setup-hotspot.sh --stop
+
+.PHONY: hotspot-status
+hotspot-status:
+	@echo ""
+	@echo "  Hotspot: $(HOTSPOT_SSID)"
+	@BRIDGE=$$(ifconfig | awk '/^bridge/{iface=$$1} /inet 192\.168\.2\./{print iface; exit}' | tr -d ':'); \
+	if [ -n "$$BRIDGE" ]; then \
+		echo "  Bridge interface: $$BRIDGE ($(HOTSPOT_IP))"; \
+		echo "  Status: ACTIVE"; \
+	else \
+		echo "  Status: not active (no 192.168.2.x bridge found)"; \
+	fi
+	@echo ""
+	@echo "  dnsmasq (xcasa DNS):"
+	@pgrep -f "dnsmasq.*natsec" >/dev/null 2>&1 && echo "  ✓ Running" || echo "  ✗ Not running"
+	@echo ""
+	@echo "  Access URLs (when connected to natsec):"
+	@echo "    http://xcasa/natsec/         ← friendly name"
+	@echo "    http://$(HOTSPOT_IP)/natsec/  ← IP fallback"
+	@echo ""
+	@echo "  Connected clients:"
+	@arp -a | grep '192\.168\.2\.' | grep -v '\.255\b' | grep -v 'permanent' | \
+		sed 's/^/    /' || echo "    none"
 	@echo ""
 
 # ── Clean ──────────────────────────────────────────────────────────────────────
