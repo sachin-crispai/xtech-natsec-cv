@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Viewer — NATSEC-CV</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #0a0a0f; color: #e2e2e2;
+  font-family: -apple-system, "Helvetica Neue", sans-serif; font-size: 13px; }
+
+/* ── Toolbar ── */
+#toolbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 44px; background: #16161a; border-bottom: 1px solid #2a2a30;
+  display: flex; align-items: center; gap: 10px; padding: 0 16px;
+}
+#toolbar a { color: #7eb8f7; text-decoration: none; font-size: 12px; }
+#toolbar a:hover { color: #fff; }
+#title { font-weight: 600; color: #fff; font-size: 13px; flex: 1; }
+#page-info { color: #666; font-size: 12px; min-width: 80px; text-align: center; }
+
+button {
+  background: #1e1e2a; border: 1px solid #333340; color: #ccc;
+  border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+}
+button:hover { background: #2a2a3a; color: #fff; }
+button:disabled { opacity: .3; cursor: default; }
+
+#zoom-display { color: #888; font-size: 12px; min-width: 44px; text-align: center; }
+
+/* ── Canvas area ── */
+#viewer {
+  margin-top: 44px;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 20px 16px; gap: 16px; min-height: calc(100vh - 44px);
+}
+.page-wrap {
+  background: #fff; border-radius: 2px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.6);
+  line-height: 0;
+}
+canvas { display: block; }
+
+/* ── Loading/error ── */
+#status {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #1a3a5c; border: 1px solid #3a7bd5; color: #7eb8f7;
+  padding: 8px 20px; border-radius: 20px; font-size: 12px;
+  display: none;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <a href="../index.html">&#8592; Gallery</a>
+  <span id="title">Loading…</span>
+  <button id="btn-prev" onclick="changePage(-1)" disabled>&#8592; Prev</button>
+  <span id="page-info">— / —</span>
+  <button id="btn-next" onclick="changePage(1)" disabled>Next &#8594;</button>
+  <span style="width:1px;height:20px;background:#2a2a34;margin:0 4px"></span>
+  <button onclick="changeZoom(-0.25)">&#8722;</button>
+  <span id="zoom-display">100%</span>
+  <button onclick="changeZoom(+0.25)">+</button>
+  <button onclick="changeZoom(0)" title="Fit to window">Fit</button>
+</div>
+
+<div id="viewer"></div>
+<div id="status" id="status"></div>
+
+<script type="module">
+import * as pdfjsLib from './pdf.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+
+// ── Resolve PDF URL from ?file= param ─────────────────────────────────────────
+const params  = new URLSearchParams(location.search);
+const fileUrl = params.get('file') || '../SIERRA-ARCHITECTURE.pdf';
+const absUrl  = new URL(fileUrl, location.href).href;
+
+document.querySelector('#title').textContent = fileUrl.split('/').pop();
+document.title = fileUrl.split('/').pop() + ' — PDF Viewer';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let pdfDoc   = null;
+let scale    = 1.5;
+let rendering = false;
+
+function status(msg) {
+  const el = document.getElementById('status');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+// ── Load PDF ──────────────────────────────────────────────────────────────────
+status('Loading PDF…');
+pdfjsLib.getDocument(absUrl).promise.then(doc => {
+  pdfDoc = doc;
+  status('');
+  renderAll();
+  updateNav(1);
+}).catch(err => {
+  status('Error loading PDF: ' + err.message);
+});
+
+// ── Render all pages ──────────────────────────────────────────────────────────
+async function renderAll() {
+  const viewer = document.getElementById('viewer');
+  viewer.innerHTML = '';
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const wrap   = document.createElement('div');
+    wrap.className = 'page-wrap';
+    wrap.id = 'page-' + p;
+    const canvas = document.createElement('canvas');
+    wrap.appendChild(canvas);
+    viewer.appendChild(wrap);
+    await renderPage(p, canvas);
+  }
+  updateNav(1);
+}
+
+async function renderPage(num, canvas) {
+  const page     = await pdfDoc.getPage(num);
+  const viewport = page.getViewport({ scale });
+  canvas.width   = viewport.width;
+  canvas.height  = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+}
+
+// ── Nav helpers ───────────────────────────────────────────────────────────────
+function updateNav(current) {
+  const total = pdfDoc ? pdfDoc.numPages : 0;
+  document.getElementById('page-info').textContent = current + ' / ' + total;
+  document.getElementById('btn-prev').disabled = current <= 1;
+  document.getElementById('btn-next').disabled = current >= total;
+  document.getElementById('zoom-display').textContent = Math.round(scale * 100) + '%';
+}
+
+function currentPage() {
+  const pages = document.querySelectorAll('.page-wrap');
+  const mid = window.innerHeight / 2;
+  let best = 1;
+  pages.forEach((el, i) => {
+    const r = el.getBoundingClientRect();
+    if (r.top <= mid) best = i + 1;
+  });
+  return best;
+}
+
+window.changePage = function(delta) {
+  const next = currentPage() + delta;
+  const el = document.getElementById('page-' + next);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+window.changeZoom = function(delta) {
+  if (delta === 0) {
+    // Fit: scale so page width = window width - padding
+    const firstCanvas = document.querySelector('canvas');
+    if (firstCanvas) {
+      const naturalW = firstCanvas.width / scale;
+      scale = Math.max(0.5, (window.innerWidth - 64) / naturalW);
+    }
+  } else {
+    scale = Math.max(0.5, Math.min(3, scale + delta));
+  }
+  renderAll();
+};
+
+// Update page indicator on scroll
+window.addEventListener('scroll', () => updateNav(currentPage()), { passive: true });
+</script>
+</body>
+</html>

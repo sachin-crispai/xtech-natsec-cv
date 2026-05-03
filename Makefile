@@ -40,6 +40,7 @@ help:
 	@echo "  Gallery:"
 	@echo "    make show-gallery        Build gallery + open in Atlas (main command)"
 	@echo "    make show-album          Open source iCloud shared album in Atlas"
+	@echo "    make show-arch-pdf       Open SIERRA architecture PDF in Atlas viewer"
 	@echo "    make split-view          Gallery left + iCloud album right in Atlas"
 	@echo "    make build-gallery       Regenerate view/index.html (images + video)"
 	@echo "    make open-view           Open view/ in Finder"
@@ -233,6 +234,12 @@ split-view: build-gallery
 show-gallery: build-gallery
 	@echo "Opening gallery in Atlas..."
 	open -a "$(ATLAS_APP)" "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/index.html"
+
+.PHONY: show-arch-pdf
+show-arch-pdf: gen-pdf build-gallery
+	@echo "Opening SIERRA architecture PDF viewer in Atlas..."
+	open -a "$(ATLAS_APP)" \
+	  "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"
 
 .PHONY: show-album
 show-album:

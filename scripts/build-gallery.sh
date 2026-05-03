@@ -9,6 +9,10 @@ VIEW="$REPO_ROOT/platform/collection/view"
 OUT="$VIEW/index.html"
 DATE="$(date '+%Y-%m-%d %H:%M')"
 
+# Copy pdfjs viewer into view/ (source lives in infra/pdfjs/ which is committed)
+mkdir -p "$VIEW/pdfjs"
+cp "$REPO_ROOT/infra/pdfjs/"* "$VIEW/pdfjs/" 2>/dev/null || true
+
 # Collect images (bash 3.2 compatible)
 IFS=$'\n' read -r -d '' -a FILES < <(find "$VIEW" -maxdepth 1 -type f \
   \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) \
@@ -252,18 +256,18 @@ cat > "$OUT" <<HTMLEOF
 $([ -f "$VIEW/SIERRA-ARCHITECTURE.pdf" ] && echo '
 <div class="docs-bar">
   <span class="docs-bar-label">Docs</span>
-  <a class="doc-link" href="SIERRA-ARCHITECTURE.pdf" target="_blank">
+  <a class="doc-link" href="pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf" target="_blank">
     <span class="doc-icon">&#128196;</span>
     <span>
       <span class="doc-name">SIERRA Architecture</span><br>
-      <span class="doc-desc">4-tier system diagram + glossary · PDF</span>
+      <span class="doc-desc">PDF viewer · page nav · zoom</span>
     </span>
   </a>
   <a class="doc-link" href="../../../docs/architecture/SIERRA-ARCHITECTURE.html" target="_blank">
     <span class="doc-icon">&#127760;</span>
     <span>
       <span class="doc-name">SIERRA Architecture</span><br>
-      <span class="doc-desc">Interactive Mermaid diagram · HTML</span>
+      <span class="doc-desc">CSS diagram + glossary · HTML</span>
     </span>
   </a>
 </div>' || echo '')
