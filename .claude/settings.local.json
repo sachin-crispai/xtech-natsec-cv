@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp \"/Users/sachin/.claude/projects/-Volumes-WORK900-CRISPAI-810-26-NATSEC-CV/3693536b-1466-41e7-91ce-f2bc2611b680/tool-results/webfetch-1777849728136-m5fide.bin\" /tmp/atlas-error.png)",
+      "Read(//tmp/**)"
+    ]
+  }
+}
