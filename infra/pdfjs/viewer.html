@@ -107,6 +107,15 @@ canvas{display:block}
 (function(){
 'use strict';
 
+  /* ── Auto-redirect file:// → http:// ─────────────────────────────────────────
+     PDF.js cannot load PDFs via file:// (CORS). If opened that way,
+     redirect to the nginx HTTP URL automatically.                               */
+  if (location.protocol === 'file:') {
+    var httpBase = 'http://localhost/natsec/pdfjs/viewer.html';
+    location.replace(httpBase + location.search);
+    // execution stops here after redirect
+  }
+
 /* ── Config ────────────────────────────────────────────────────────────────── */
 var params  = new URLSearchParams(location.search);
 var fileRel = params.get('file') || '../SIERRA-ARCHITECTURE.pdf';

@@ -256,11 +256,11 @@ cat > "$OUT" <<HTMLEOF
 $([ -f "$VIEW/SIERRA-ARCHITECTURE.pdf" ] && echo '
 <div class="docs-bar">
   <span class="docs-bar-label">Docs</span>
-  <a class="doc-link" href="pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf" target="_blank">
+  <a class="doc-link" href="http://localhost/natsec/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf" target="_blank">
     <span class="doc-icon">&#128196;</span>
     <span>
       <span class="doc-name">SIERRA Architecture</span><br>
-      <span class="doc-desc">PDF viewer · page nav · zoom</span>
+      <span class="doc-desc">PDF viewer · 1 / 2 / 4 page · zoom</span>
     </span>
   </a>
   <a class="doc-link" href="../../../docs/architecture/SIERRA-ARCHITECTURE.html" target="_blank">
