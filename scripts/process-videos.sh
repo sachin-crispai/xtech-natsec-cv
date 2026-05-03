@@ -83,9 +83,13 @@ while IFS= read -r VIDEO; do
   log "[$BASENAME] ${DURATION}s — ${WIDTH}x${HEIGHT}"
 
   # ── Cap resolution at 720p ────────────────────────────────────────────────
+  # SCALE_FILTER for clips (standalone -vf)
+  # FRAME_VF for frames (combined with fps filter to avoid duplicate -vf flags)
   SCALE_FILTER=""
+  FRAME_VF="fps=${FRAME_FPS}"
   if [[ -n "$HEIGHT" && "$HEIGHT" -gt 720 ]]; then
     SCALE_FILTER="-vf scale=-2:720"
+    FRAME_VF="fps=${FRAME_FPS},scale=-2:720"
     log "  → scaling down to 720p"
   fi
 
@@ -98,6 +102,10 @@ while IFS= read -r VIDEO; do
     CLIP_OUT="$CLIPS_DIR/$CLIP_NAME"
 
     log "  clip $SEG: ${START}s → $((START + CLIP_DURATION))s → $CLIP_NAME"
+    if [[ -f "$CLIP_OUT" ]] && ! $DRY_RUN; then
+      log "    → already exists, skipping"
+      START=$((START + CLIP_DURATION)); SEG=$((SEG + 1)); TOTAL_CLIPS=$((TOTAL_CLIPS + 1)); continue
+    fi
     if ! $DRY_RUN; then
       ffmpeg -y -v quiet \
         -ss "$START" -i "$VIDEO" \
@@ -107,7 +115,7 @@ while IFS= read -r VIDEO; do
         -b:v 1200k -maxrate 1500k -bufsize 3000k \
         -c:a aac -b:a 128k \
         -movflags +faststart \
-        "$CLIP_OUT" 2>/dev/null
+        "$CLIP_OUT" 2>/dev/null || { warn "ffmpeg failed for $CLIP_NAME"; continue; }
       SIZE=$(du -sh "$CLIP_OUT" | cut -f1)
       log "    → $SIZE"
     fi
@@ -120,17 +128,22 @@ while IFS= read -r VIDEO; do
   # ── Extract frames at N fps ───────────────────────────────────────────────
   FRAME_OUT_DIR="$FRAMES_DIR/${NAME}"
   mkdir -p "$FRAME_OUT_DIR"
-  log "  frames: extracting at ${FRAME_FPS}fps → $FRAME_OUT_DIR/"
-  if ! $DRY_RUN; then
-    ffmpeg -y -v quiet \
-      -i "$VIDEO" \
-      $SCALE_FILTER \
-      -vf "fps=${FRAME_FPS}" \
-      -q:v 2 \
-      "$FRAME_OUT_DIR/frame_%04d.jpg" 2>/dev/null
-    NFRAMES=$(find "$FRAME_OUT_DIR" -name "*.jpg" | wc -l | tr -d ' ')
-    TOTAL_FRAMES=$((TOTAL_FRAMES + NFRAMES))
-    log "  → $NFRAMES frames extracted"
+  EXISTING_FRAMES=$(find "$FRAME_OUT_DIR" -name "*.jpg" 2>/dev/null | wc -l | tr -d ' ')
+  if [[ "$EXISTING_FRAMES" -gt 0 ]] && ! $DRY_RUN; then
+    log "  frames: $EXISTING_FRAMES already extracted, skipping"
+    TOTAL_FRAMES=$((TOTAL_FRAMES + EXISTING_FRAMES))
+  else
+    log "  frames: extracting at ${FRAME_FPS}fps → $FRAME_OUT_DIR/"
+    if ! $DRY_RUN; then
+      ffmpeg -y -v quiet \
+        -i "$VIDEO" \
+        -vf "$FRAME_VF" \
+        -q:v 2 \
+        "$FRAME_OUT_DIR/frame_%04d.jpg" 2>/dev/null || warn "frame extraction failed for $NAME"
+      NFRAMES=$(find "$FRAME_OUT_DIR" -name "*.jpg" | wc -l | tr -d ' ')
+      TOTAL_FRAMES=$((TOTAL_FRAMES + NFRAMES))
+      log "  → $NFRAMES frames extracted"
+    fi
   fi
 
   echo ""
