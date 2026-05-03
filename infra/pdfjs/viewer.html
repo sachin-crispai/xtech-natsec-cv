@@ -5,169 +5,172 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Viewer — NATSEC-CV</title>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; background: #0a0a0f; color: #e2e2e2;
-  font-family: -apple-system, "Helvetica Neue", sans-serif; font-size: 13px; }
-
-/* ── Toolbar ── */
-#toolbar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: 44px; background: #16161a; border-bottom: 1px solid #2a2a30;
-  display: flex; align-items: center; gap: 10px; padding: 0 16px;
-}
-#toolbar a { color: #7eb8f7; text-decoration: none; font-size: 12px; }
-#toolbar a:hover { color: #fff; }
-#title { font-weight: 600; color: #fff; font-size: 13px; flex: 1; }
-#page-info { color: #666; font-size: 12px; min-width: 80px; text-align: center; }
-
-button {
-  background: #1e1e2a; border: 1px solid #333340; color: #ccc;
-  border-radius: 6px; padding: 4px 12px; font-size: 12px; cursor: pointer;
-}
-button:hover { background: #2a2a3a; color: #fff; }
-button:disabled { opacity: .3; cursor: default; }
-
-#zoom-display { color: #888; font-size: 12px; min-width: 44px; text-align: center; }
-
-/* ── Canvas area ── */
-#viewer {
-  margin-top: 44px;
-  display: flex; flex-direction: column; align-items: center;
-  padding: 20px 16px; gap: 16px; min-height: calc(100vh - 44px);
-}
-.page-wrap {
-  background: #fff; border-radius: 2px;
-  box-shadow: 0 4px 24px rgba(0,0,0,.6);
-  line-height: 0;
-}
-canvas { display: block; }
-
-/* ── Loading/error ── */
-#status {
-  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-  background: #1a3a5c; border: 1px solid #3a7bd5; color: #7eb8f7;
-  padding: 8px 20px; border-radius: 20px; font-size: 12px;
-  display: none;
-}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#0a0a0f;color:#e2e2e2;font-family:-apple-system,"Helvetica Neue",sans-serif;font-size:13px}
+#toolbar{position:fixed;top:0;left:0;right:0;z-index:100;height:46px;background:#16161a;border-bottom:1px solid #2a2a30;display:flex;align-items:center;gap:10px;padding:0 16px}
+#toolbar a{color:#7eb8f7;text-decoration:none;font-size:12px;flex-shrink:0}
+#toolbar a:hover{color:#fff}
+#title{font-weight:600;color:#fff;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#page-info{color:#666;font-size:12px;min-width:56px;text-align:center;flex-shrink:0}
+.sep{width:1px;height:20px;background:#2a2a34;flex-shrink:0}
+button{background:#1e1e2a;border:1px solid #333340;color:#ccc;border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;flex-shrink:0}
+button:hover{background:#2a2a3a;color:#fff}
+button:disabled{opacity:.35;cursor:default}
+#zoom-display{color:#777;font-size:12px;min-width:42px;text-align:center;flex-shrink:0}
+#viewer{margin-top:46px;display:flex;flex-direction:column;align-items:center;padding:20px 16px;gap:16px}
+.page-wrap{background:#fff;border-radius:2px;box-shadow:0 4px 24px rgba(0,0,0,.7);line-height:0}
+canvas{display:block}
+#status{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0e1e34;border:1px solid #3a7bd5;color:#7eb8f7;padding:8px 20px;border-radius:20px;font-size:12px;pointer-events:none;display:none}
+#error{margin:60px auto;max-width:480px;text-align:center;background:#1a0808;border:1px solid #7f1d1d;border-radius:8px;padding:24px;color:#fca5a5;display:none}
+#error h2{margin-bottom:8px;color:#f87171}
+#error code{display:block;margin-top:12px;background:#0d0d0f;padding:8px;border-radius:4px;font-size:11px;color:#94a3b8;word-break:break-all;text-align:left}
 </style>
 </head>
 <body>
 
 <div id="toolbar">
   <a href="../index.html">&#8592; Gallery</a>
-  <span id="title">Loading…</span>
+  <div class="sep"></div>
+  <span id="title">Loading...</span>
   <button id="btn-prev" onclick="changePage(-1)" disabled>&#8592; Prev</button>
-  <span id="page-info">— / —</span>
+  <span id="page-info">- / -</span>
   <button id="btn-next" onclick="changePage(1)" disabled>Next &#8594;</button>
-  <span style="width:1px;height:20px;background:#2a2a34;margin:0 4px"></span>
+  <div class="sep"></div>
   <button onclick="changeZoom(-0.25)">&#8722;</button>
-  <span id="zoom-display">100%</span>
-  <button onclick="changeZoom(+0.25)">+</button>
-  <button onclick="changeZoom(0)" title="Fit to window">Fit</button>
+  <span id="zoom-display">150%</span>
+  <button onclick="changeZoom(0.25)">+</button>
+  <button onclick="fitPage()">Fit</button>
 </div>
 
-<div id="viewer"></div>
-<div id="status" id="status"></div>
+<div id="viewer">
+  <div id="status">Initializing PDF viewer...</div>
+  <div id="error">
+    <h2>Could not render PDF</h2>
+    <p id="err-msg"></p>
+    <code id="err-url"></code>
+  </div>
+</div>
 
-<script type="module">
-import * as pdfjsLib from './pdf.min.js';
-pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+<!-- UMD build: loads as global pdfjsLib, works on file:// without CORS issues -->
+<script src="./pdf.min.js"></script>
+<script>
+var params  = new URLSearchParams(location.search);
+var fileRel = params.get('file') || '../SIERRA-ARCHITECTURE.pdf';
+var fileAbs = new URL(fileRel, location.href).href;
+var pdfDoc  = null;
+var scale   = 1.5;
 
-// ── Resolve PDF URL from ?file= param ─────────────────────────────────────────
-const params  = new URLSearchParams(location.search);
-const fileUrl = params.get('file') || '../SIERRA-ARCHITECTURE.pdf';
-const absUrl  = new URL(fileUrl, location.href).href;
+document.getElementById('title').textContent = decodeURIComponent(fileRel.split('/').pop());
+document.getElementById('err-url').textContent = fileAbs;
 
-document.querySelector('#title').textContent = fileUrl.split('/').pop();
-document.title = fileUrl.split('/').pop() + ' — PDF Viewer';
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let pdfDoc   = null;
-let scale    = 1.5;
-let rendering = false;
-
-function status(msg) {
-  const el = document.getElementById('status');
-  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+function setStatus(msg) {
+  var el = document.getElementById('status');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
 }
 
-// ── Load PDF ──────────────────────────────────────────────────────────────────
-status('Loading PDF…');
-pdfjsLib.getDocument(absUrl).promise.then(doc => {
-  pdfDoc = doc;
-  status('');
-  renderAll();
-  updateNav(1);
-}).catch(err => {
-  status('Error loading PDF: ' + err.message);
-});
+function showError(msg) {
+  setStatus('');
+  document.getElementById('err-msg').textContent = msg;
+  document.getElementById('error').style.display = 'block';
+}
 
-// ── Render all pages ──────────────────────────────────────────────────────────
-async function renderAll() {
-  const viewer = document.getElementById('viewer');
-  viewer.innerHTML = '';
-  for (let p = 1; p <= pdfDoc.numPages; p++) {
-    const wrap   = document.createElement('div');
-    wrap.className = 'page-wrap';
-    wrap.id = 'page-' + p;
-    const canvas = document.createElement('canvas');
-    wrap.appendChild(canvas);
-    viewer.appendChild(wrap);
-    await renderPage(p, canvas);
+if (typeof pdfjsLib === 'undefined') {
+  showError('pdf.min.js failed to load. Check the file path.');
+} else {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = './pdf.worker.min.js';
+  setStatus('Loading PDF...');
+
+  pdfjsLib.getDocument(fileAbs).promise.then(function(doc) {
+    pdfDoc = doc;
+    setStatus('Rendering ' + doc.numPages + ' pages...');
+    return renderAll();
+  }).then(function() {
+    setStatus('');
+    updateNav();
+  }).catch(function(err) {
+    showError(err.message || String(err));
+  });
+}
+
+function renderAll() {
+  var viewer = document.getElementById('viewer');
+  document.querySelectorAll('.page-wrap').forEach(function(el){ el.remove(); });
+  var p = Promise.resolve();
+  for (var i = 1; i <= pdfDoc.numPages; i++) {
+    (function(num) {
+      p = p.then(function() { return renderPage(num); });
+    })(i);
   }
-  updateNav(1);
+  return p;
 }
 
-async function renderPage(num, canvas) {
-  const page     = await pdfDoc.getPage(num);
-  const viewport = page.getViewport({ scale });
-  canvas.width   = viewport.width;
-  canvas.height  = viewport.height;
-  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+function renderPage(num) {
+  return pdfDoc.getPage(num).then(function(page) {
+    var vp     = page.getViewport({ scale: scale });
+    var canvas = document.createElement('canvas');
+    var wrap   = document.createElement('div');
+    wrap.className = 'page-wrap';
+    wrap.id = 'page-' + num;
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+    wrap.appendChild(canvas);
+    document.getElementById('viewer').appendChild(wrap);
+    return page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+  });
 }
 
-// ── Nav helpers ───────────────────────────────────────────────────────────────
-function updateNav(current) {
-  const total = pdfDoc ? pdfDoc.numPages : 0;
-  document.getElementById('page-info').textContent = current + ' / ' + total;
-  document.getElementById('btn-prev').disabled = current <= 1;
-  document.getElementById('btn-next').disabled = current >= total;
-  document.getElementById('zoom-display').textContent = Math.round(scale * 100) + '%';
-}
-
-function currentPage() {
-  const pages = document.querySelectorAll('.page-wrap');
-  const mid = window.innerHeight / 2;
-  let best = 1;
-  pages.forEach((el, i) => {
-    const r = el.getBoundingClientRect();
-    if (r.top <= mid) best = i + 1;
+function currentPageNum() {
+  var mid = window.scrollY + window.innerHeight / 2;
+  var best = 1;
+  document.querySelectorAll('.page-wrap').forEach(function(el, i) {
+    if (el.offsetTop <= mid) best = i + 1;
   });
   return best;
 }
 
-window.changePage = function(delta) {
-  const next = currentPage() + delta;
-  const el = document.getElementById('page-' + next);
+function updateNav() {
+  var total = pdfDoc ? pdfDoc.numPages : 0;
+  var cur   = currentPageNum();
+  document.getElementById('page-info').textContent = cur + ' / ' + total;
+  document.getElementById('btn-prev').disabled = (cur <= 1);
+  document.getElementById('btn-next').disabled = (cur >= total);
+  document.getElementById('zoom-display').textContent = Math.round(scale * 100) + '%';
+}
+
+function changePage(delta) {
+  var next = currentPageNum() + delta;
+  var el   = document.getElementById('page-' + next);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
+  setTimeout(updateNav, 350);
+}
 
-window.changeZoom = function(delta) {
-  if (delta === 0) {
-    // Fit: scale so page width = window width - padding
-    const firstCanvas = document.querySelector('canvas');
-    if (firstCanvas) {
-      const naturalW = firstCanvas.width / scale;
-      scale = Math.max(0.5, (window.innerWidth - 64) / naturalW);
-    }
-  } else {
-    scale = Math.max(0.5, Math.min(3, scale + delta));
+function changeZoom(delta) {
+  scale = Math.max(0.5, Math.min(3.5, scale + delta));
+  rerender();
+}
+
+function fitPage() {
+  var first = document.querySelector('canvas');
+  if (first && pdfDoc) {
+    pdfDoc.getPage(1).then(function(page) {
+      var nat = page.getViewport({ scale: 1 });
+      scale = Math.max(0.5, (window.innerWidth - 48) / nat.width);
+      rerender();
+    });
   }
-  renderAll();
-};
+}
 
-// Update page indicator on scroll
-window.addEventListener('scroll', () => updateNav(currentPage()), { passive: true });
+function rerender() {
+  if (!pdfDoc) return;
+  setStatus('Re-rendering...');
+  renderAll().then(function() { setStatus(''); updateNav(); });
+}
+
+window.changePage  = changePage;
+window.changeZoom  = changeZoom;
+window.fitPage     = fitPage;
+window.addEventListener('scroll', updateNav, { passive: true });
 </script>
 </body>
 </html>

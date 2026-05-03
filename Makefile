@@ -238,8 +238,14 @@ show-gallery: build-gallery
 .PHONY: show-arch-pdf
 show-arch-pdf: gen-pdf build-gallery
 	@echo "Opening SIERRA architecture PDF viewer in Atlas..."
-	open -a "$(ATLAS_APP)" \
-	  "file://$(REPO_ROOT)/$(COLLECTION_VIEW)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"
+	@if pgrep -x nginx >/dev/null 2>&1; then \
+	  open -a "$(ATLAS_APP)" "http://localhost/$(NGINX_SUBPATH)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"; \
+	else \
+	  echo "  nginx not running — starting it first..."; \
+	  $(MAKE) serve; \
+	  sleep 2; \
+	  open -a "$(ATLAS_APP)" "http://localhost/$(NGINX_SUBPATH)/pdfjs/viewer.html?file=../SIERRA-ARCHITECTURE.pdf"; \
+	fi
 
 .PHONY: show-album
 show-album:
