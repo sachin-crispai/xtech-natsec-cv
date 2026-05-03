@@ -20,7 +20,34 @@ NGINX_CONF_DIR   := /usr/local/etc/nginx
 NGINX_SUBPATH    := natsec
 SERVE_PORT       := 80
 
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := top-ten
+
+# ── Top ten ────────────────────────────────────────────────────────────────────
+.PHONY: top-ten
+top-ten:
+	@echo ""
+	@echo "  NATSEC-CV — Top Ten Commands"
+	@echo "  ════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "  ── Sync + View ──────────────────────────────────────────────"
+	@echo "  1.  make sync-from-link            Pull new photos from iCloud album URL"
+	@echo "  2.  make collect                   Sync + convert HEIC→JPEG in one step"
+	@echo "  3.  make process-videos            Clip + frame-extract new videos"
+	@echo "  4.  make show-gallery              Rebuild gallery + open in Atlas"
+	@echo "  5.  make split-view                Gallery left | iCloud source right in Atlas"
+	@echo ""
+	@echo "  ── Status + Diagnostics ────────────────────────────────────"
+	@echo "  6.  make photo-status PHONE=91     Pipeline audit — counts at every stage"
+	@echo "  7.  make doctor                    Deep stack diagnostic + exact fix commands"
+	@echo ""
+	@echo "  ── Customer Demo (SIERRA) ──────────────────────────────────"
+	@echo "  8.  make sierra-start              Start secure gallery on SIERRA network"
+	@echo "  9.  make add-guest NAME=x PASS=y   Create guest login + QR code"
+	@echo "  10. make revoke-all-guests         Lock gallery after demo"
+	@echo ""
+	@echo "  ════════════════════════════════════════════════════════════"
+	@echo "  Run 'make help' for all commands  |  'make show-notes' for field fixes"
+	@echo ""
 
 # ── Help ───────────────────────────────────────────────────────────────────────
 .PHONY: help
@@ -58,7 +85,16 @@ help:
 	@echo "    make down                Tear everything down cleanly"
 	@echo "    make speedtest           Network diagnostics + gallery serve benchmarks"
 	@echo ""
-	@echo "  Hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
+	@echo "  SIERRA — secure customer demo network:"
+	@echo "    make sierra-start        Configure authenticated gallery on SIERRA"
+	@echo "    make sierra-stop         Stop SIERRA gallery"
+	@echo "    make sierra-dns-setup    Print DNS config instructions for DECO/router"
+	@echo "    make add-guest           NAME=john [PASS=x]  create guest credential + QR"
+	@echo "    make list-guests         Show active guest credentials"
+	@echo "    make revoke-guest        NAME=john  remove one guest"
+	@echo "    make revoke-all-guests   Lock gallery after demo (remove all guests)"
+	@echo ""
+	@echo "  TAHOE ops hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
 	@echo "    make hotspot-start       Create 'natsec' Wi-Fi hotspot + xcasa DNS"
 	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
 	@echo "    make hotspot-status      Show hotspot state and connected clients"
@@ -319,6 +355,78 @@ serve-status:
 	@echo ""
 
 
+# ── SIERRA secure customer network ────────────────────────────────────────────
+NAME ?=
+PASS ?=
+
+.PHONY: sierra-start
+sierra-start: build-gallery serve-setup
+	@echo ""
+	@echo "  Starting SIERRA secure customer network (requires sudo)..."
+	sudo bash scripts/sierra-start.sh
+
+.PHONY: sierra-dns-setup
+sierra-dns-setup:
+	@echo ""
+	@TAHOE_IP=$$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr bridge103 2>/dev/null || echo "10.0.0.66"); \
+	echo "  ╔══════════════════════════════════════════════════════════╗"; \
+	echo "  ║  SIERRA DNS Setup — one-time config in DECO/router      ║"; \
+	echo "  ╠══════════════════════════════════════════════════════════╣"; \
+	echo "  ║  TAHOE (this rig) is running dnsmasq at: $$TAHOE_IP     ║"; \
+	echo "  ║  It owns the 'sierra' domain.                           ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  To make  tahoe.sierra  resolve on phones:              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  TP-Link DECO app:                                      ║"; \
+	echo "  ║    More → Advanced → DNS (or Internet → DNS)           ║"; \
+	echo "  ║    Primary DNS   : $$TAHOE_IP                           ║"; \
+	echo "  ║    Secondary DNS : 8.8.8.8                              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  Xfinity/router admin (http://10.0.0.1):                ║"; \
+	echo "  ║    Connected Devices → TAHOE → Reserve IP               ║"; \
+	echo "  ║    Then: DNS → Custom → Primary: $$TAHOE_IP              ║"; \
+	echo "  ║                                                         ║"; \
+	echo "  ║  After saving, phones reconnect to SIERRA and then:    ║"; \
+	echo "  ║    http://tahoe.sierra/gallery/   ← works on all phones ║"; \
+	echo "  ║    http://gallery.sierra/         ← short alias        ║"; \
+	echo "  ╠══════════════════════════════════════════════════════════╣"; \
+	echo "  ║  Without DNS config — IP fallback always works:        ║"; \
+	echo "  ║    http://$$TAHOE_IP/gallery/                           ║"; \
+	echo "  ╚══════════════════════════════════════════════════════════╝"; \
+	echo ""
+
+.PHONY: sierra-stop
+sierra-stop:
+	@echo ""
+	@echo "  Stopping SIERRA..."
+	@sudo pkill -f "dnsmasq.*sierra" 2>/dev/null || true
+	@sudo /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 0" \
+	  /Library/Preferences/SystemConfiguration/com.apple.nat.plist 2>/dev/null || true
+	@sudo launchctl kickstart -k system/com.apple.NetworkSharing 2>/dev/null || true
+	@sudo rm -f /usr/local/etc/nginx/servers/sierra.conf
+	@sudo /usr/local/opt/nginx/bin/nginx -s reload \
+	  -c /usr/local/etc/nginx/nginx.conf 2>/dev/null || true
+	@echo "  SIERRA stopped. Guests can no longer connect."
+	@echo ""
+
+.PHONY: add-guest
+add-guest:
+	@[ -n "$(NAME)" ] || { echo "  Usage: make add-guest NAME=john [PASS=secret]"; exit 1; }
+	@sudo bash scripts/manage-guests.sh add "$(NAME)" "$(PASS)"
+
+.PHONY: list-guests
+list-guests:
+	@bash scripts/manage-guests.sh list
+
+.PHONY: revoke-guest
+revoke-guest:
+	@[ -n "$(NAME)" ] || { echo "  Usage: make revoke-guest NAME=john"; exit 1; }
+	@sudo bash scripts/manage-guests.sh revoke "$(NAME)"
+
+.PHONY: revoke-all-guests
+revoke-all-guests:
+	@sudo bash scripts/manage-guests.sh revoke-all
+
 # ── Quick start / stop ─────────────────────────────────────────────────────────
 .PHONY: up
 up:
@@ -414,6 +522,10 @@ speedtest:
 
 # ── Hotspot ────────────────────────────────────────────────────────────────────
 HOTSPOT_SSID     := natsec
+SIERRA_SSID      := SIERRA
+SIERRA_PASS      := sierra2026
+SIERRA_GATEWAY   := 192.168.2.1
+SIERRA_AUTH_FILE := /usr/local/etc/nginx/.sierra-auth
 HOTSPOT_PASSWORD := natsec2026
 HOTSPOT_IP       := 192.168.2.1
 
