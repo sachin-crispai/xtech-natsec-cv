@@ -108,11 +108,26 @@ echo ""
 # ── Step 1: Configure plist ────────────────────────────────────────────────────
 echo "  [1/4] Configuring Internet Sharing plist..."
 
-# Internet source = detected Ethernet
-/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Device $ETH_DEV"    "$PLIST"
-/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Enabled 1"          "$PLIST"
+# Set Ethernet as the internet source (share FROM)
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Device $ETH_DEV"              "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:Enabled 1"                    "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :NAT:PrimaryInterface:PrimaryUserReadable $ETH_NAME" "$PLIST"
 
-# Hotspot settings — WPA2, visible SSID, auto channel
+# CRITICAL: Remove the Ethernet device from SharingDevices —
+# a device cannot be both the internet source AND a sharing destination.
+# This is the #1 reason the hotspot doesn't broadcast.
+IDX=0
+while true; do
+  VAL=$(/usr/libexec/PlistBuddy -c "Print :NAT:SharingDevices:$IDX" "$PLIST" 2>/dev/null) || break
+  if [[ "$VAL" == "$ETH_DEV" ]]; then
+    /usr/libexec/PlistBuddy -c "Delete :NAT:SharingDevices:$IDX" "$PLIST"
+    echo "     Removed $ETH_DEV from SharingDevices (was source+destination conflict)"
+    break
+  fi
+  IDX=$((IDX + 1))
+done
+
+# Hotspot: WPA2, visible SSID, auto channel
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkName $HOTSPOT_SSID"       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:NetworkPassword $WIFI_PASSWORD"  "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:40BitEncrypt 0"                  "$PLIST"
@@ -120,13 +135,23 @@ echo "  [1/4] Configuring Internet Sharing plist..."
 /usr/libexec/PlistBuddy -c "Set :NAT:AirPort:Enabled 1"                       "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :NAT:Enabled 1"                               "$PLIST"
 
-echo "     Source: $ETH_DEV | SSID: $HOTSPOT_SSID | Encryption: WPA2 | Channel: auto"
+echo "     Source: $ETH_DEV ($ETH_NAME) | SSID: $HOTSPOT_SSID | WPA2 | Channel: auto"
 
 # ── Step 2: Restart Internet Sharing ──────────────────────────────────────────
 echo "  [2/4] Restarting Internet Sharing..."
+
+# Kill existing InternetSharing process cleanly
+pkill -x InternetSharing 2>/dev/null || true
+sleep 1
+
+# Unload then reload NetworkSharing launchd daemon
 launchctl unload /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
 sleep 1
-launchctl load  /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist
+launchctl load   /System/Library/LaunchDaemons/com.apple.NetworkSharing.plist 2>/dev/null || true
+sleep 1
+
+# Also kick the InternetSharing binary directly (handles Sequoia changes)
+/usr/libexec/InternetSharing &
 sleep 4
 
 # Wait for bridge to get its IP
