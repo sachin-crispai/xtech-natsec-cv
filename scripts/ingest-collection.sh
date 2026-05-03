@@ -102,6 +102,13 @@ done < <(find "$INBOX" -maxdepth 1 -type f \( \
   -o -iname "*.png" -o -iname "*.mov" -o -iname "*.mp4" \
 \) -print0 | sort -z)
 
+# ── Fix permissions so nginx worker (nobody) can read all files ────────────────
+if ! $DRY_RUN; then
+  find "$VIEW" -type f -exec chmod 644 {} \;
+  find "$VIEW" -type d -exec chmod 755 {} \;
+  log "Permissions set to 644/755 on view/ (required for nginx worker)"
+fi
+
 # ── Manifest footer ────────────────────────────────────────────────────────────
 if ! $DRY_RUN; then
   cat >> "$MANIFEST" <<FOOTER
