@@ -57,10 +57,15 @@ help:
 	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
 	@echo "    make hotspot-status      Show hotspot state and connected clients"
 	@echo ""
+	@echo "  Diagnostics / recovery:"
+	@echo "    make check               Full stack health check"
+	@echo "    make speedtest           Network speed + gallery benchmarks"
+	@echo "    make fix-routes          Fix broken IPv4 routing after hotspot start (safe)"
+	@echo "    make show-notes          Known issues, gotchas, and field fixes"
+	@echo ""
 	@echo "  Utilities:"
-	@echo "    make check               Full stack health check (hotspot+nginx+dns+gallery)"
-	@echo "    make install-deps        Install osxphotos (requires pipx)"
-	@echo "    make check-deps          Check required tools are present"
+	@echo "    make check-deps          Check required tools are installed"
+	@echo "    make install-deps        Install osxphotos"
 	@echo "    make inbox-status        Show what's waiting in inbox/"
 	@echo "    make clean-inbox         Remove all files from inbox/"
 	@echo "    make clean-view          Rebuild view/ from processed/"
@@ -452,6 +457,111 @@ check:
 	@echo "  Hotspot: http://$(HOTSPOT_IP)/$(NGINX_SUBPATH)/  (IP fallback)"
 	@echo ""
 	@echo "══════════════════════════════════════════"
+	@echo ""
+
+# ── Route fix ──────────────────────────────────────────────────────────────────
+#
+# KNOWN ISSUE: macOS Internet Sharing rewrites the IPv4 routing table when it
+# starts. It injects bridge interfaces (bridge100-103) as default routes with
+# the reject flag (!), which replaces the real gateway (10.0.0.1 via en9) and
+# kills internet connectivity on the Mac.
+#
+# SAFE FIX: renew DHCP on the Ethernet interface only. This re-requests the
+# gateway from the router without touching any other routes. It is safe to run
+# at any time and is idempotent.
+#
+# UNSAFE ALTERNATIVE (do NOT automate): `sudo route flush` — this removes ALL
+# routes including loopback and link-local, causing a brief full network outage
+# while macOS rebuilds them. Only use manually if DHCP renewal fails.
+#
+.PHONY: fix-routes
+fix-routes:
+	@echo ""
+	@echo "  Checking IPv4 routing..."
+	@INET=$$(ping -c 1 -t 2 8.8.8.8 2>/dev/null | grep -c "1 received" || echo 0); \
+	if [ "$$INET" = "1" ]; then \
+	  echo "  ✓ Internet is reachable — no fix needed."; \
+	else \
+	  echo "  ✗ No internet. Renewing DHCP on Ethernet (en9)..."; \
+	  echo "    (This is safe — only renews the Ethernet lease, touches nothing else)"; \
+	  sudo ipconfig set en9 DHCP; \
+	  sleep 3; \
+	  GW=$$(netstat -rn -f inet 2>/dev/null | awk '/default.*en9/{print $$2; exit}'); \
+	  if [ -n "$$GW" ]; then \
+	    echo "  ✓ Route restored — gateway: $$GW via en9"; \
+	  else \
+	    echo "  ✗ DHCP renewal did not restore route. Manual fix:"; \
+	    echo "    sudo route delete default"; \
+	    echo "    sudo route add default 10.0.0.1"; \
+	  fi; \
+	fi
+	@echo ""
+
+# ── Field notes ────────────────────────────────────────────────────────────────
+#
+# This target is a field reference — run it at a customer site to recall known
+# issues and their fixes without needing internet access or documentation.
+#
+.PHONY: show-notes
+show-notes:
+	@echo ""
+	@echo "╔══════════════════════════════════════════════════════════════════╗"
+	@echo "║  NATSEC-CV Field Notes — Known Issues & Fixes                   ║"
+	@echo "╠══════════════════════════════════════════════════════════════════╣"
+	@echo "║                                                                  ║"
+	@echo "║  ISSUE 1 — Hotspot SSID not visible on phones                   ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  Causes:                                                         ║"
+	@echo "║    a) WEP encryption (40BitEncrypt=1) — iOS 14+/Android 10+     ║"
+	@echo "║       silently hides WEP networks in the Wi-Fi list             ║"
+	@echo "║    b) Ethernet interface in both PrimaryInterface (source) and  ║"
+	@echo "║       SharingDevices (destination) — prevents AP from starting  ║"
+	@echo "║    c) InternetSharing not actually running despite plist=on     ║"
+	@echo "║  Fix: make hotspot-start   (script handles all three)           ║"
+	@echo "║                                                                  ║"
+	@echo "║  ISSUE 2 — Internet lost on Mac after hotspot starts            ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  Cause: Internet Sharing injects bridge interfaces as IPv4      ║"
+	@echo "║    default routes with reject flag (!), replacing the real      ║"
+	@echo "║    gateway (10.0.0.1 via en9 Ethernet)                          ║"
+	@echo "║  Symptom: ping 8.8.8.8 → 100% loss; git push fails             ║"
+	@echo "║  Fix: make fix-routes   (renews DHCP on en9, safe + automatic)  ║"
+	@echo "║  Manual: sudo ipconfig set en9 DHCP                            ║"
+	@echo "║  Nuclear (avoid): sudo route flush  ← disrupts all networking  ║"
+	@echo "║                                                                  ║"
+	@echo "║  ISSUE 3 — Gallery blank / images missing (403)                 ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  Cause: osxphotos exports photos as -rw------- (owner-only).   ║"
+	@echo "║    nginx worker runs as 'nobody' and cannot read them on        ║"
+	@echo "║    external macOS volumes even after chmod 644                  ║"
+	@echo "║  Fix: nginx.conf sets 'user sachin staff' so worker inherits   ║"
+	@echo "║    owner permissions. Auto-applied by make serve-setup.         ║"
+	@echo "║  If it recurs: make clean-view && make build-gallery            ║"
+	@echo "║                                                                  ║"
+	@echo "║  ISSUE 4 — Phone gets 404 on http://xcasa/natsec               ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  Cause: browser requests /natsec without trailing slash;        ║"
+	@echo "║    nginx location block only matches /natsec/ (with slash)      ║"
+	@echo "║  Fix: natsec.conf has 'location = /natsec { return 301 /natsec/}'║"
+	@echo "║    Auto-applied by make serve-setup. If it recurs, restart:    ║"
+	@echo "║    make serve-stop && make serve                                ║"
+	@echo "║                                                                  ║"
+	@echo "║  ISSUE 5 — mamba.local doesn't resolve on Android              ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  Cause: Android does not support mDNS (.local) by default      ║"
+	@echo "║  Fix: use IP address instead:  http://192.168.2.1/natsec/      ║"
+	@echo "║    dnsmasq resolves 'xcasa' on the hotspot — use that instead  ║"
+	@echo "║                                                                  ║"
+	@echo "║  CUSTOMER SITE QUICK CHECKLIST                                  ║"
+	@echo "║  ─────────────────────────────────────────────────────────────  ║"
+	@echo "║  1. Plug in Ethernet cable                                       ║"
+	@echo "║  2. make speedtest          verify internet before starting     ║"
+	@echo "║  3. make up                 starts everything                   ║"
+	@echo "║  4. make check              verify all green                    ║"
+	@echo "║  5. If internet dies:  make fix-routes                         ║"
+	@echo "║  6. Share: Wi-Fi=natsec  Password=natsec2026  URL=xcasa/natsec ║"
+	@echo "║  7. make down               clean teardown before leaving       ║"
+	@echo "╚══════════════════════════════════════════════════════════════════╝"
 	@echo ""
 
 # ── Clean ──────────────────────────────────────────────────────────────────────
