@@ -27,6 +27,26 @@ echo "  [2/2] Demo DMZ network (wg1 · port 51821)..."
 wg-quick up "$REPO_ROOT/infra/vpn/server/wg1-demo.conf"
 echo "        DEMO   → 10.9.0.2"
 
+  echo "  [3/3] Starting VPN DNS (natsec, tahoe, mamba → 10.0.0.66)..."
+
+# Kill any existing instance
+pkill -f "dnsmasq.*sierra" 2>/dev/null || true
+sleep 0.5
+
+# Deploy DNS config — listens on 127.0.0.1:5300
+mkdir -p /usr/local/etc/dnsmasq.d
+cp "$REPO_ROOT/infra/dnsmasq/sierra.conf" /usr/local/etc/dnsmasq.d/sierra.conf
+/usr/local/sbin/dnsmasq \
+  --conf-file=/usr/local/etc/dnsmasq.d/sierra.conf \
+  --pid-file=/tmp/dnsmasq-sierra.pid
+echo "     dnsmasq on 127.0.0.1:5300 (PID: $(cat /tmp/dnsmasq-sierra.pid 2>/dev/null || echo '?'))"
+
+# Load pf redirect: VPN client DNS queries (10.8.0.1:53) → dnsmasq:5300
+cp "$REPO_ROOT/infra/vpn/pf-dns.conf" /etc/pf.anchors/sierra-vpn-dns
+pfctl -f /etc/pf.conf 2>/dev/null || true
+pfctl -a sierra-vpn-dns -f /etc/pf.anchors/sierra-vpn-dns 2>/dev/null && \
+  echo "     pf DNS redirect active (utun8:53 → 127.0.0.1:5300)"
+
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
 echo "  ║  SIERRA VPN is LIVE                             ║"
