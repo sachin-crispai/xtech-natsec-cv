@@ -18,13 +18,26 @@ fi
 echo ""
 echo "  Starting SIERRA VPN"
 echo "  ─────────────────────────────────────"
+
+# Fix permissions — wg-quick warns on world-readable configs
+chmod 600 "$REPO_ROOT/infra/vpn/server/wg0-operators.conf" \
+           "$REPO_ROOT/infra/vpn/server/wg1-demo.conf" 2>/dev/null || true
+
 echo "  [1/2] Operator network (wg0 · port 51820)..."
-wg-quick up "$REPO_ROOT/infra/vpn/server/wg0-operators.conf"
+if wg show utun8 >/dev/null 2>&1; then
+  echo "        already running — skipping (use make vpn-stop first to restart)"
+else
+  wg-quick up "$REPO_ROOT/infra/vpn/server/wg0-operators.conf"
+fi
 echo "        KEN    → 10.8.0.2"
 echo "        SACHIN → 10.8.0.3"
 
 echo "  [2/2] Demo DMZ network (wg1 · port 51821)..."
-wg-quick up "$REPO_ROOT/infra/vpn/server/wg1-demo.conf"
+if wg show utun9 >/dev/null 2>&1; then
+  echo "        already running — skipping"
+else
+  wg-quick up "$REPO_ROOT/infra/vpn/server/wg1-demo.conf"
+fi
 echo "        DEMO   → 10.9.0.2"
 
   echo "  [3/3] Starting VPN DNS (natsec, tahoe, mamba → 10.0.0.66)..."
