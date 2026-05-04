@@ -64,6 +64,8 @@ help:
 	@echo "    make vpn-stop            Stop both VPN interfaces"
 	@echo "    make vpn-status          Show connected peers and traffic stats"
 	@echo "    make vpn-clients         Show active clients with handshake + nginx activity"
+	@echo "    make demo-report         Full demo client diagnostic (use when clients can't connect)"
+	@echo "    make vpn-add-demo        NAME=x  Provision a new demo client + print QR"
 	@echo "    make vpn-show-ken        Print KEN config + display QR code"
 	@echo "    make vpn-show-sachin     Print SACHIN config + display QR code"
 	@echo "    make vpn-show-demo       Print DEMO DMZ config + display QR code"
@@ -502,6 +504,15 @@ vpn-clients:
 	@grep "10\.9\." /usr/local/var/log/nginx/access.log 2>/dev/null | tail -3 | \
 	  awk '{print "    " $$1 " " $$7 " " $$9}' || echo "    none"
 	@echo ""
+
+.PHONY: demo-report
+demo-report:
+	@bash scripts/demo-report.sh
+
+.PHONY: vpn-add-demo
+vpn-add-demo:
+	@[ -n "$(NAME)" ] || { echo "  Usage: make vpn-add-demo NAME=user2"; exit 1; }
+	@sudo bash scripts/vpn-add-demo.sh "$(NAME)"
 
 .PHONY: vpn-show-ken
 vpn-show-ken:
