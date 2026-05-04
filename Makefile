@@ -59,6 +59,14 @@ help:
 	@echo "    make down                Tear everything down cleanly"
 	@echo "    make speedtest           Network diagnostics + gallery serve benchmarks"
 	@echo ""
+	@echo "  VPN — secure operator + demo access (WireGuard):"
+	@echo "    make vpn-start           Start WireGuard: operator (wg0) + demo DMZ (wg1)"
+	@echo "    make vpn-stop            Stop both VPN interfaces"
+	@echo "    make vpn-status          Show connected peers and traffic stats"
+	@echo "    make vpn-show-ken        Print KEN config + display QR code"
+	@echo "    make vpn-show-sachin     Print SACHIN config + display QR code"
+	@echo "    make vpn-show-demo       Print DEMO DMZ config + display QR code"
+	@echo ""
 	@echo "  Hotspot (natsec Wi-Fi → http://xcasa/natsec/):"
 	@echo "    make hotspot-start       Create 'natsec' Wi-Fi hotspot + xcasa DNS"
 	@echo "    make hotspot-stop        Tear down hotspot and dnsmasq"
@@ -436,6 +444,62 @@ speedtest:
 	@echo "  2-3 MB photo JPEG  → ~0.3s  on 100 Mbps hotspot"
 	@echo "  5-6 MB video clip  → ~0.5s  on 100 Mbps hotspot"
 	@echo "══════════════════════════════════════════════════"
+	@echo ""
+
+# ── WireGuard VPN ──────────────────────────────────────────────────────────────
+VPN_OPERATORS_CONF := $(REPO_ROOT)/infra/vpn/server/wg0-operators.conf
+VPN_DEMO_CONF      := $(REPO_ROOT)/infra/vpn/server/wg1-demo.conf
+
+.PHONY: vpn-start
+vpn-start:
+	@echo ""
+	@echo "  Starting SIERRA VPN (requires sudo)..."
+	sudo bash scripts/vpn-start.sh
+
+.PHONY: vpn-stop
+vpn-stop:
+	@echo ""
+	@echo "  Stopping SIERRA VPN..."
+	sudo bash scripts/vpn-start.sh --stop
+
+.PHONY: vpn-status
+vpn-status:
+	@echo ""
+	@echo "  ── Operator network (wg0) ──────────────"
+	@sudo wg show wg0 2>/dev/null || echo "  wg0: not running"
+	@echo ""
+	@echo "  ── Demo DMZ network (wg1) ──────────────"
+	@sudo wg show wg1 2>/dev/null || echo "  wg1: not running"
+	@echo ""
+
+.PHONY: vpn-show-ken
+vpn-show-ken:
+	@echo ""
+	@echo "  ── KEN — Operator VPN Config ───────────"
+	@cat infra/vpn/clients/ken.conf
+	@echo ""
+	@echo "  QR code (scan with WireGuard app on phone):"
+	@qrencode -t ANSIUTF8 < infra/vpn/clients/ken.conf 2>/dev/null || echo "  (brew install qrencode for QR)"
+	@echo ""
+
+.PHONY: vpn-show-sachin
+vpn-show-sachin:
+	@echo ""
+	@echo "  ── SACHIN — Operator VPN Config ────────"
+	@cat infra/vpn/clients/sachin.conf
+	@echo ""
+	@echo "  QR code (scan with WireGuard app on phone):"
+	@qrencode -t ANSIUTF8 < infra/vpn/clients/sachin.conf 2>/dev/null || echo "  (brew install qrencode for QR)"
+	@echo ""
+
+.PHONY: vpn-show-demo
+vpn-show-demo:
+	@echo ""
+	@echo "  ── DEMO — DMZ VPN Config (restricted) ──"
+	@cat infra/vpn/clients/demo.conf
+	@echo ""
+	@echo "  QR code (scan with WireGuard app on phone):"
+	@qrencode -t ANSIUTF8 < infra/vpn/clients/demo.conf 2>/dev/null || echo "  (brew install qrencode for QR)"
 	@echo ""
 
 # ── Hotspot ────────────────────────────────────────────────────────────────────

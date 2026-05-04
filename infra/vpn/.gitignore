@@ -1,0 +1,8 @@
+# Private keys and preshared keys — NEVER commit
+keys/*.key
+keys/*.psk
+
+# Client configs contain private keys — distribute out-of-band
+clients/ken.conf
+clients/sachin.conf
+clients/demo.conf
