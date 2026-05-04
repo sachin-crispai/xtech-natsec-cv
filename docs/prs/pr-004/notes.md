@@ -142,3 +142,41 @@ Demo participants / prospective customers
 | `capture/IMG_0218.jpeg` | PR #004 — closeup of KEN + SPECTRO → VPN Server path |
 | `capture/IMG_0219.jpeg` | PR #004 — closeup of DemoGateway + Demo VPN path |
 | `capture/IMG_0220.jpeg` | PR #004 — wide view showing SIERRA boundary + full access paths |
+
+---
+
+## VPN Access — Confirmed Setup (2026-05-03)
+
+### Network Layout
+
+```
+TAHOE rig (mamba)
+  en0       : 10.0.0.66   (Xfinity / main LAN)
+  bridge103 : 192.168.2.1 (DECO hotspot bridge)
+  utun8     : 10.8.0.1    (WireGuard — operator net, port 51820)
+  utun9     : 10.9.0.1    (WireGuard — demo DMZ,    port 51821)
+
+DECO mesh (SIERRA Wi-Fi)
+  WAN       : 192.168.2.2 (connected to TAHOE bridge)
+  LAN       : SIERRA phones (DECO-managed subnet)
+```
+
+### iPhone Tunnel Names (installed 2026-05-03)
+
+| Tunnel name | User | VPN IP | Port | Access |
+|-------------|------|--------|------|--------|
+| `sierra-ken` | KEN | 10.8.0.2 | 51820 | Full SIERRA — 10.0.0.0/24 + 10.8.0.0/24 |
+| `sierra-sachin` | SACHIN | 10.8.0.3 | 51820 | Full SIERRA — 10.0.0.0/24 + 10.8.0.0/24 |
+| `sierra-demo` | DEMO | 10.9.0.2 | 51821 | DMZ only — 10.9.0.0/24 |
+
+### Gallery URL (when VPN is ON)
+
+| User | Gallery URL |
+|------|-------------|
+| KEN / SACHIN | `http://10.0.0.66/natsec/` |
+| DEMO | `http://10.9.0.1/natsec/` (DemoGateway — needs nginx on utun9 IP) |
+
+### Status (2026-05-03)
+- wg0 (operators): ACTIVE — ports 51820 open, peers registered
+- wg1 (demo DMZ): ACTIVE — port 51821 open, peer registered
+- All three configs installed on iPhones ✅
