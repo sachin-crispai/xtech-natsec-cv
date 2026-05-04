@@ -63,6 +63,7 @@ help:
 	@echo "    make vpn-start           Start WireGuard: operator (wg0) + demo DMZ (wg1)"
 	@echo "    make vpn-stop            Stop both VPN interfaces"
 	@echo "    make vpn-status          Show connected peers and traffic stats"
+	@echo "    make vpn-clients         Show active clients with handshake + nginx activity"
 	@echo "    make vpn-show-ken        Print KEN config + display QR code"
 	@echo "    make vpn-show-sachin     Print SACHIN config + display QR code"
 	@echo "    make vpn-show-demo       Print DEMO DMZ config + display QR code"
@@ -472,6 +473,34 @@ vpn-status:
 	@echo ""
 	@echo "  ── Demo DMZ network (wg1) ──────────────"
 	@sudo wg show wg1 2>/dev/null || echo "  wg1: not running"
+	@echo ""
+
+.PHONY: vpn-clients
+vpn-clients:
+	@echo ""
+	@echo "  ── Operator VPN (wg0/utun8 · port 51820) ────────────────────"
+	@sudo wg show utun8 2>/dev/null | grep -E "peer:|endpoint:|latest handshake:|transfer:|allowed ips:" | \
+	  sed 's/peer:.*/  Peer: (pubkey hidden)/' | \
+	  sed 's/  endpoint:/    endpoint:/' | \
+	  sed 's/  latest handshake:/    handshake:/' | \
+	  sed 's/  transfer:/    transfer:/' | \
+	  sed 's/  allowed ips:/    VPN IP:/' || echo "  utun8: not running"
+	@echo ""
+	@echo "  ── Demo DMZ VPN (wg1/utun9 · port 51821) ────────────────────"
+	@sudo wg show utun9 2>/dev/null | grep -E "peer:|endpoint:|latest handshake:|transfer:|allowed ips:" | \
+	  sed 's/peer:.*/  Peer: (pubkey hidden)/' | \
+	  sed 's/  endpoint:/    endpoint:/' | \
+	  sed 's/  latest handshake:/    handshake:/' | \
+	  sed 's/  transfer:/    transfer:/' | \
+	  sed 's/  allowed ips:/    VPN IP:/' || echo "  utun9: not running"
+	@echo ""
+	@echo "  ── Recent activity (nginx last 10 requests) ──────────────────"
+	@echo "  Operators (10.8.0.x):"
+	@grep "10\.8\." /usr/local/var/log/nginx/access.log 2>/dev/null | tail -3 | \
+	  awk '{print "    " $$1 " " $$7 " " $$9}' || echo "    none"
+	@echo "  Demo (10.9.0.x):"
+	@grep "10\.9\." /usr/local/var/log/nginx/access.log 2>/dev/null | tail -3 | \
+	  awk '{print "    " $$1 " " $$7 " " $$9}' || echo "    none"
 	@echo ""
 
 .PHONY: vpn-show-ken
