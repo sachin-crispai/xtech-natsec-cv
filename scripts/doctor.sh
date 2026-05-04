@@ -227,6 +227,38 @@ DNSMASQ_CONF="/usr/local/etc/dnsmasq.d/natsec-hotspot.conf"
   || { fail "dnsmasq config missing"; fix "make hotspot-start"; }
 
 # ══════════════════════════════════════════════════════════════
+sep "5b. VPN — WireGuard operator + demo DMZ"
+# ══════════════════════════════════════════════════════════════
+
+# Operator VPN (wg0 / utun8)
+if sudo wg show utun8 >/dev/null 2>&1; then
+  SACHIN_HS=$(sudo wg show utun8 latest-handshakes 2>/dev/null | awk '/0lnH/{print $2}')
+  KEN_HS=$(sudo wg show utun8 latest-handshakes 2>/dev/null | awk '/KaKc/{print $2}')
+  pass "Operator VPN (wg0 utun8) running — port 51820"
+  [ -n "$SACHIN_HS" ] && [ "$SACHIN_HS" -gt 0 ] 2>/dev/null \
+    && pass "SACHIN (10.8.0.3) — handshake active" \
+    || warn "SACHIN (10.8.0.3) — no recent handshake (activate sierra-sachin on iPhone)"
+  [ -n "$KEN_HS" ] && [ "$KEN_HS" -gt 0 ] 2>/dev/null \
+    && pass "KEN (10.8.0.2) — handshake active" \
+    || warn "KEN (10.8.0.2) — no recent handshake (activate sierra-ken on iPhone)"
+else
+  fail "Operator VPN (wg0) not running"
+  fix "make vpn-start"
+fi
+
+# Demo DMZ VPN (wg1 / utun9)
+if sudo wg show utun9 >/dev/null 2>&1; then
+  pass "Demo DMZ VPN (wg1 utun9) running — port 51821"
+  DEMO_HS=$(sudo wg show utun9 latest-handshakes 2>/dev/null | awk '{print $2}' | head -1)
+  [ -n "$DEMO_HS" ] && [ "$DEMO_HS" -gt 0 ] 2>/dev/null \
+    && pass "DEMO (10.9.0.2) — handshake active" \
+    || warn "DEMO (10.9.0.2) — no recent handshake (activate sierra-demo on iPhone)"
+else
+  fail "Demo DMZ VPN (wg1) not running"
+  fix "make vpn-start"
+fi
+
+# ══════════════════════════════════════════════════════════════
 sep "6. System — Touch ID + tools"
 # ══════════════════════════════════════════════════════════════
 

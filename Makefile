@@ -362,6 +362,7 @@ up:
 	@echo "  └─────────────────────────────────────────┘"
 	@echo ""
 	@$(MAKE) build-gallery
+	@$(MAKE) vpn-start
 	@$(MAKE) hotspot-start
 	@$(MAKE) serve
 	@echo ""
@@ -380,6 +381,7 @@ down:
 	@echo "  Shutting down NATSEC-CV stack..."
 	@$(MAKE) serve-stop       2>/dev/null || true
 	@$(MAKE) hotspot-stop     2>/dev/null || true
+	@$(MAKE) vpn-stop         2>/dev/null || true
 	@echo "  Done."
 	@echo ""
 
