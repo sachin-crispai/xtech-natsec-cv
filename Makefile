@@ -497,8 +497,15 @@ vpn-show-sachin:
 .PHONY: vpn-show-demo
 vpn-show-demo:
 	@echo ""
-	@echo "  ── DEMO — DMZ VPN Config (restricted) ──"
+	@echo "  ── DEMO — DMZ VPN Config (restricted) ──────────────"
 	@cat infra/vpn/clients/demo.conf
+	@echo ""
+	@echo "  ── Access URLs (connect sierra-demo VPN first) ──────"
+	@echo "  DNS name : http://natsec/natsec/     ← use this first"
+	@echo "  IP addr  : http://10.9.0.1/natsec/   ← fallback / debug"
+	@echo ""
+	@echo "  If IP works but DNS fails  → run: make vpn-start (refreshes DNS)"
+	@echo "  If IP also fails           → VPN tunnel not connected"
 	@echo ""
 	@echo "  QR code (scan with WireGuard app on phone):"
 	@qrencode -t ANSIUTF8 < infra/vpn/clients/demo.conf 2>/dev/null || echo "  (brew install qrencode for QR)"
