@@ -40,25 +40,38 @@ else
 fi
 echo "        DEMO   → 10.9.0.2"
 
-  echo "  [3/3] Starting VPN DNS (natsec, tahoe, mamba → 10.0.0.66)..."
+  echo "  [3/3] Starting VPN DNS..."
 
-# Kill any existing instance
-pkill -f "dnsmasq.*sierra" 2>/dev/null || true
-sleep 0.5
+  # Kill any existing instances
+  pkill -f "dnsmasq.*sierra" 2>/dev/null || true
+  pkill -f "dnsmasq.*demo.pid" 2>/dev/null || true
+  sleep 0.5
 
-# Deploy DNS config — listens on 127.0.0.1:5300
-mkdir -p /usr/local/etc/dnsmasq.d
-cp "$REPO_ROOT/infra/dnsmasq/sierra.conf" /usr/local/etc/dnsmasq.d/sierra.conf
-/usr/local/sbin/dnsmasq \
-  --conf-file=/usr/local/etc/dnsmasq.d/sierra.conf \
-  --pid-file=/tmp/dnsmasq-sierra.pid
-echo "     dnsmasq on 127.0.0.1:5300 (PID: $(cat /tmp/dnsmasq-sierra.pid 2>/dev/null || echo '?'))"
+  # Operator DNS (port 5300) — natsec → 10.0.0.66
+  mkdir -p /usr/local/etc/dnsmasq.d
+  cp "$REPO_ROOT/infra/dnsmasq/sierra.conf" /usr/local/etc/dnsmasq.d/sierra.conf
+  /usr/local/sbin/dnsmasq \
+    --conf-file=/usr/local/etc/dnsmasq.d/sierra.conf \
+    --pid-file=/tmp/dnsmasq-sierra.pid
+  echo "     operator DNS on :5300 — natsec → 10.0.0.66 (PID $(cat /tmp/dnsmasq-sierra.pid 2>/dev/null))"
 
-# Load pf redirect: VPN client DNS queries (10.8.0.1:53) → dnsmasq:5300
-cp "$REPO_ROOT/infra/vpn/pf-dns.conf" /etc/pf.anchors/sierra-vpn-dns
-pfctl -f /etc/pf.conf 2>/dev/null || true
-pfctl -a sierra-vpn-dns -f /etc/pf.anchors/sierra-vpn-dns 2>/dev/null && \
-  echo "     pf DNS redirect active (utun8:53 → 127.0.0.1:5300)"
+  # Demo DMZ DNS (port 5301) — natsec → 10.9.0.1 (in demo AllowedIPs)
+  # --no-hosts: /etc/hosts has natsec=10.0.0.66 which must be ignored for demo
+  /usr/local/sbin/dnsmasq \
+    --conf-file=/dev/null --no-hosts --no-resolv \
+    --port=5301 --listen-address=127.0.0.1 \
+    --address=/natsec/10.9.0.1 --address=/natsec.sierra/10.9.0.1 \
+    --address=/tahoe/10.9.0.1 --address=/tahoe.sierra/10.9.0.1 \
+    --address=/gallery.sierra/10.9.0.1 --address=/mamba/10.9.0.1 \
+    --server=8.8.8.8 \
+    --pid-file=/tmp/dnsmasq-demo.pid
+  echo "     demo DMZ DNS on :5301  — natsec → 10.9.0.1  (PID $(cat /tmp/dnsmasq-demo.pid 2>/dev/null))"
+
+  # Load pf redirects: utun8:53 → 5300 (operators), utun9:53 → 5301 (demo)
+  cp "$REPO_ROOT/infra/vpn/pf-dns.conf" /etc/pf.anchors/sierra-vpn-dns
+  pfctl -f /etc/pf.conf 2>/dev/null || true
+  pfctl -a sierra-vpn-dns -f /etc/pf.anchors/sierra-vpn-dns 2>/dev/null && \
+    echo "     pf: utun8:53→5300 (operators)  utun9:53→5301 (demo)"
 
 echo ""
 echo "  ╔══════════════════════════════════════════════════╗"
